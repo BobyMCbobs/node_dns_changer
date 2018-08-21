@@ -1,4 +1,4 @@
-// node-dns-changer
+// node_dns_changer
 
 //
 // Copyright (C) 2018 Caleb Woodbine <calebwoodbine.public@gmail.com>
