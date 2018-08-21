@@ -37,7 +37,7 @@ function _getExecutionOutput(command) {
 	return usercmd;
 }
 
-function setDNSserver({DNSservers, DNSbackupName, loggingEnable}) {
+function setDNSservers({DNSservers, DNSbackupName, loggingEnable}) {
 	// set a DNS per platform
 	if (loggingEnable == true) console.log('Setting DNS servers:', DNSservers);
 	if (DNSservers === undefined) throw "You must include at two DNS server addresses";
@@ -83,7 +83,7 @@ function setDNSserver({DNSservers, DNSbackupName, loggingEnable}) {
 			if (loggingEnable == true) console.log('WIRELESS :', interfaces_wireless);
 			if (/^[0-9a-zA-Z]+$/.test(interfaces_ethernet)) for (x in interfaces_ethernet) {
 				// set DNS servers per ethernet interface
-				console.log('Setting ethernet interface:', interfaces_ethernet[x].trim());
+				if (loggingEnable == true) console.log('Setting ethernet interface:', interfaces_ethernet[x].trim());
 				_execute(String('netsh interface ipv4 set dns name="'+interfaces_ethernet[x]+'" static ' + DNSservers[0] + ' primary'));
 				_execute(String('netsh interface ipv4 add dns name="'+interfaces_ethernet[x]+'" ' + DNSservers[1] + ' index=2'));
 			}
@@ -102,7 +102,7 @@ function setDNSserver({DNSservers, DNSbackupName, loggingEnable}) {
 	}
 }
 
-function restoreDNSserver({DNSbackupName, loggingEnable}) {
+function restoreDNSservers({DNSbackupName, loggingEnable}) {
 	// restore DNS from backup per platform
 	if (DNSbackupName === undefined) var DNSbackupName="before-dns-changer";
 	if (os == 'linux') {
