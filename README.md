@@ -13,7 +13,7 @@ Standard usage:
 ```javascript
 var dns_changer = require('node_dns_changer');
 
-// set DNS servers with backup file of 'dnsBackup'
+// set DNS servers with backup name of 'dnsBackup'
 dns_changer.setDNSserver({
 	DNSservers:['8.8.8.8','8.8.4.4'],
 	DNSbackupName:'dnsBackup'
@@ -24,6 +24,15 @@ dns_changer.restoreDNSserver({
 	DNSbackupName:'dnsBackup',
 	loggingEnable:true
 });
+
+// setup DNS servers without a custom backup name
+dns_changer.setDNSserver({
+	DNSservers:['8.8.8.8','8.8.4.4']
+});
+
+// restore settings without a custom backup name
+dns_changer.restoreDNSserver({});
+
 ```
 ## How it works
 ### Installation

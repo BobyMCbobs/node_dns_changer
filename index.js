@@ -19,7 +19,7 @@
 //
 
 const exec = require('child_process').exec;
-const os = require('os');
+const os = require('os').platform;
 const fs = require('fs');
 const shell = require('shelljs');
 shell.config.silent = true;
@@ -41,29 +41,29 @@ function setDNSserver({DNSservers, DNSbackupName, loggingEnable}) {
 	// set a DNS per platform
 	if (loggingEnable == true) console.log('Setting DNS servers:', DNSservers);
 	if (DNSservers === undefined) throw "You must include at two DNS server addresses";
-	if (DNSbackupName === undefined) DNSbackupName="before-dns-changer";
-	switch(os.platform()) {
-		case 'linux':
-			// move resolv.conf to another location
-			if (loggingEnable == true) console.log('Backing up resolv.conf');
-			fs.rename('/etc/resolv.conf', String('/etc/resolv.conf.'+DNSbackupName), (err) => {
-				if (err) throw err;
-				if (loggingEnable == true) console.log('Renamed file.');
-			});
-			if (loggingEnable == true) console.log('Writing resolv.conf');
-			// write new DNS server config
-			fs.writeFile('/etc/resolv.conf', String("nameserver "+DNSservers[0]+'\n'+"nameserver "+DNSservers[1]+'\n'), function (err) {
-				if (err) throw err;
-				if (loggingEnable == true) console.log('Saved file.');
-			});
-			if (loggingEnable == true) console.log('Changing permissions');
-			// make resolv.conf immutable
-			_execute('chattr +i /etc/resolv.conf');
-			if (loggingEnable == true) console.log('Flushing DNS cache (if systemd-resolve is available).');
-			// flush DNS cache
-			_getExecutionOutput('which systemd-resolve && systemd-resolve --flush-caches');
-			_getExecutionOutput('which nscd && service nscd reload && service nscd restart');
-		case 'darwin':
+	if (DNSbackupName === undefined) var DNSbackupName="before-dns-changer";
+	if (os == 'linux') {
+		// move resolv.conf to another location
+		if (loggingEnable == true) console.log('Backing up resolv.conf');
+		fs.rename('/etc/resolv.conf', String('/etc/resolv.conf.'+DNSbackupName), (err) => {
+			if (err) throw err;
+			if (loggingEnable == true) console.log('Renamed file.');
+		});
+		if (loggingEnable == true) console.log('Writing resolv.conf');
+		// write new DNS server config
+		fs.writeFile('/etc/resolv.conf', String("nameserver "+DNSservers[0]+'\n'+"nameserver "+DNSservers[1]+'\n'), function (err) {
+			if (err) throw err;
+			if (loggingEnable == true) console.log('Saved file.');
+		});
+		if (loggingEnable == true) console.log('Changing permissions');
+		// make resolv.conf immutable
+		_execute('chattr +i /etc/resolv.conf');
+		if (loggingEnable == true) console.log('Flushing DNS cache (if systemd-resolve is available).');
+		// flush DNS cache
+		_getExecutionOutput('which systemd-resolve && systemd-resolve --flush-caches');
+		_getExecutionOutput('which nscd && service nscd reload && service nscd restart');
+	}
+	else if (os == 'darwin') {
 			// get interfaces
 			var interfaces = _getExecutionOutput('networksetup -listallnetworkservices | sed 1,1d');
 			if (loggingEnable == true) console.log('Backing up current DNS servers');
@@ -74,8 +74,8 @@ function setDNSserver({DNSservers, DNSbackupName, loggingEnable}) {
 				if (loggingEnable == true) console.log("Setting interface:", interfaces[x]);
 				_getExecutionOutput(String('networksetup -setdnsservers "'+interfaces[x]+'"' + DNSservers.join(' ')));
 			}
-
-		case 'win32':
+	}
+	else if (os == 'win32') {
 			// get interfaces
 			var interfaces_ethernet = String(_getExecutionOutput('ipconfig | find /i "Ethernet adapter"').trim().split(' ').slice(2)).replace(':','').split(' ');
 			var interfaces_wireless = String(_getExecutionOutput('ipconfig | find /i "Wireless LAN adapter"').trim().split(' ').slice(3)).replace(':','').split(' ');
@@ -97,70 +97,78 @@ function setDNSserver({DNSservers, DNSbackupName, loggingEnable}) {
 			// flush DNS cache
 			_getExecutionOutput('ipconfig /flushdns');
 	}
+	else {
+			if (loggingEnable == true) console.log("Error: Unsupported platform. ");
+	}
 }
 
 function restoreDNSserver({DNSbackupName, loggingEnable}) {
 	// restore DNS from backup per platform
-	switch (os.platform()) {
-		case 'linux':
-			if (loggingEnable == true) console.log('Changing permissions');
-			// make mutable
-			_execute('chattr -i /etc/resolv.conf');
-			if (loggingEnable == true) console.log('Moving resolv.conf')
-			// check if resolv.conf exists
-			if (shell.test('-f', String('/etc/resolv.conf.'+DNSbackupName))) {
-				if (loggingEnable == true) console.log('Found backed up resolv file.');
-			}
-			else {
-				if (loggingEnable == true) throw 'Could not find backed up resolv file.';
-			}
-			// move backup to resolv.conf
-			fs.rename(String('/etc/resolv.conf.'+DNSbackupName), '/etc/resolv.conf', (err) => {
-				if (err) throw err;
-				if (loggingEnable == true) console.log('Renamed file.');
-			});
-			if (loggingEnable == true) console.log('Flushing resolve cache');
-			// flush DNS cache
-			_getExecutionOutput('which systemd-resolve && systemd-resolve --flush-caches');
-			_getExecutionOutput('which nscd && service nscd reload && service nscd restart');
-		case 'darwin':
-			// check if backup file exists
-			var DNSservers;
-			if (shell.test('-f', String('/Library/Caches/'+DNSbackupName+'.txt'))) {
-				if (loggingEnable == true) console.log('Found backed up DNS file.');
-				var DNSservers = shell.cat(String('/Library/Caches/'+DNSbackupName+'.txt')).stdout;
-			}
-			else {
-				if (loggingEnable == true) throw console.log('Could not find backed up DNS file.');
-			}
-			// get network interfaces
-			var interfaces = _getExecutionOutput('networksetup -listallnetworkservices | sed 1,1d');
-			if (loggingEnable == true) console.log('Backing up current DNS servers');
-			for (x in interfaces) {
-				// restore backed up server addresses per interface
-				if (loggingEnable == true) console.log("INTERFACE:", interfaces[x]);
-				_getExecutionOutput('networksetup -setdnsservers "'+interfaces[x]+'"' + DNSservers.join(' '));
-			}
-			// remove backup
-			shell.rm(String('/Library/Caches/'+DNSbackupName+'.txt'));
-		case 'win32':
-			// get interfaces
-			var interfaces_ethernet = String(_getExecutionOutput('ipconfig | find /i "Ethernet adapter"').trim().split(' ').slice(2)).replace(':','').split(' ');
-			var interfaces_wireless = String(_getExecutionOutput('ipconfig | find /i "Wireless LAN adapter"').trim().split(' ').slice(3)).replace(':','').split(' ');
-			if (loggingEnable == true) console.log('ETHERNET  :', interfaces_ethernet);
-			if (loggingEnable == true) console.log('WIRELESS :', interfaces_wireless);
-			if (/^[0-9a-zA-Z]+$/.test(interfaces_ethernet)) for (x in interfaces_ethernet) {
-				// restore backed up DNS addresses per ethernet interface
-				if (loggingEnable == true) console.log('Setting ethernet interface:', interfaces_ethernet[x]);
-				_execute(String('netsh interface ipv4 set dns name="'+interfaces_ethernet[x]+'" dhcp'));
-			}
-			if (/^[0-9a-zA-Z]+$/.test(interfaces_wireless)) for (x in interfaces_wireless) {
-				// restore backed up DNS addresses per wireless interface
-				if (loggingEnable == true) console.log('Setting wireless interface:', interfaces_wireless[x]);
-				_execute(String('netsh interface ipv4 set dns name="'+interfaces_wireless[x]+'" dhcp'));
-			}
-			if (loggingEnable == true) console.log('Flushing DNS cache.');
-			// flush DNS cache
-			_getExecutionOutput('ipconfig /flushdns');
+	if (DNSbackupName === undefined) var DNSbackupName="before-dns-changer";
+	if (os == 'linux') {
+		if (loggingEnable == true) console.log('Changing permissions');
+		// make mutable
+		_execute('chattr -i /etc/resolv.conf');
+		if (loggingEnable == true) console.log('Moving resolv.conf')
+		// check if resolv.conf exists
+		if (shell.test('-f', String('/etc/resolv.conf.'+DNSbackupName))) {
+			if (loggingEnable == true) console.log('Found backed up resolv file.');
+		}
+		else {
+			if (loggingEnable == true) throw 'Could not find backed up resolv file.';
+		}
+		// move backup to resolv.conf
+		fs.rename(String('/etc/resolv.conf.'+DNSbackupName), '/etc/resolv.conf', (err) => {
+			if (err) throw err;
+			if (loggingEnable == true) console.log('Renamed file.');
+		});
+		if (loggingEnable == true) console.log('Flushing resolve cache');
+		// flush DNS cache
+		_getExecutionOutput('which systemd-resolve && systemd-resolve --flush-caches');
+		_getExecutionOutput('which nscd && service nscd reload && service nscd restart');
+	}
+	else if (os == 'darwin') {
+		// check if backup file exists
+		var DNSservers;
+		if (shell.test('-f', String('/Library/Caches/'+DNSbackupName+'.txt'))) {
+			if (loggingEnable == true) console.log('Found backed up DNS file.');
+			var DNSservers = shell.cat(String('/Library/Caches/'+DNSbackupName+'.txt')).stdout;
+		}
+		else {
+			if (loggingEnable == true) throw console.log('Could not find backed up DNS file.');
+		}
+		// get network interfaces
+		var interfaces = _getExecutionOutput('networksetup -listallnetworkservices | sed 1,1d');
+		if (loggingEnable == true) console.log('Backing up current DNS servers');
+		for (x in interfaces) {
+			// restore backed up server addresses per interface
+			if (loggingEnable == true) console.log("INTERFACE:", interfaces[x]);
+			_getExecutionOutput('networksetup -setdnsservers "'+interfaces[x]+'"' + DNSservers.join(' '));
+		}
+		// remove backup
+		shell.rm(String('/Library/Caches/'+DNSbackupName+'.txt'));
+	}
+	else if (os == 'win32') {
+		// get interfaces
+		var interfaces_ethernet = String(_getExecutionOutput('ipconfig | find /i "Ethernet adapter"').trim().split(' ').slice(2)).replace(':','').split(' ');
+		var interfaces_wireless = String(_getExecutionOutput('ipconfig | find /i "Wireless LAN adapter"').trim().split(' ').slice(3)).replace(':','').split(' ');
+		if (loggingEnable == true) console.log('ETHERNET  :', interfaces_ethernet);
+		if (loggingEnable == true) console.log('WIRELESS :', interfaces_wireless);
+		if (/^[0-9a-zA-Z]+$/.test(interfaces_ethernet)) for (x in interfaces_ethernet) {
+			// restore backed up DNS addresses per ethernet interface
+			if (loggingEnable == true) console.log('Setting ethernet interface:', interfaces_ethernet[x]);
+			_execute(String('netsh interface ipv4 set dns name="'+interfaces_ethernet[x]+'" dhcp'));
+		}
+		if (/^[0-9a-zA-Z]+$/.test(interfaces_wireless)) for (x in interfaces_wireless) {
+			// restore backed up DNS addresses per wireless interface
+			if (loggingEnable == true) console.log('Setting wireless interface:', interfaces_wireless[x]);
+			_execute(String('netsh interface ipv4 set dns name="'+interfaces_wireless[x]+'" dhcp'));
+		}
+		if (loggingEnable == true) console.log('Flushing DNS cache.');
+		// flush DNS cache
+		_getExecutionOutput('ipconfig /flushdns');
+	}
+	else {
+		if (loggingEnable == true) console.log('Error: Unsupported platform.')
 	}
 }
