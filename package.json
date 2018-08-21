@@ -1,5 +1,5 @@
 {
-  "name": "node-dns-changer",
+  "name": "node_dns_changer",
   "version": "1.0.0",
   "description": "A simple NodeJS DNS changer",
   "main": "index.js",

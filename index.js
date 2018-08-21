@@ -125,8 +125,10 @@ function restoreDNSserver({DNSbackupName, loggingEnable}) {
 			_getExecutionOutput('which nscd && service nscd reload && service nscd restart');
 		case 'darwin':
 			// check if backup file exists
-			if (shell.test('-f', '/Library/Caches/'+DNSbackupName+'.txt')) {
+			var DNSservers;
+			if (shell.test('-f', String('/Library/Caches/'+DNSbackupName+'.txt'))) {
 				if (loggingEnable == true) console.log('Found backed up DNS file.');
+				var DNSservers = shell.cat(String('/Library/Caches/'+DNSbackupName+'.txt')).stdout;
 			}
 			else {
 				if (loggingEnable == true) throw console.log('Could not find backed up DNS file.');
@@ -140,7 +142,7 @@ function restoreDNSserver({DNSbackupName, loggingEnable}) {
 				_getExecutionOutput('networksetup -setdnsservers "'+interfaces[x]+'"' + DNSservers.join(' '));
 			}
 			// remove backup
-			shell.rm('/Library/Caches/'+DNSbackupName+'.txt');
+			shell.rm(String('/Library/Caches/'+DNSbackupName+'.txt'));
 		case 'win32':
 			// get interfaces
 			var interfaces_ethernet = String(_getExecutionOutput('ipconfig | find /i "Ethernet adapter"').trim().split(' ').slice(2)).replace(':','').split(' ');
