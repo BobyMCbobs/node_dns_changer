@@ -24,6 +24,8 @@ const fs = require('fs');
 const shell = require('shelljs');
 shell.config.silent = true;
 
+var macOSignoreInterfaces = ['iPhone USB', ''];
+
 function _execute(command){
 	// execute a system command
 	exec(command, function(error, stdout, stderr){
@@ -33,11 +35,17 @@ function _execute(command){
 
 function _getExecutionOutput(command) {
 	// return output of a command
-	var usercmd = shell.exec(command).stdout;
+	var usercmd;
+	try {
+		usercmd = shell.exec(command).stdout;
+	}
+	catch(error) {
+		usercmd = exec(command);
+	}
 	return usercmd;
 }
 
-function setDNSservers({DNSservers, DNSbackupName, loggingEnable}) {
+exports.setDNSservers = function({DNSservers, DNSbackupName, loggingEnable}) {
 	// set a DNS per platform
 	if (loggingEnable == true) console.log('Setting DNS servers:', DNSservers);
 	if (DNSservers === undefined) throw "You must include at two DNS server addresses";
@@ -64,45 +72,47 @@ function setDNSservers({DNSservers, DNSbackupName, loggingEnable}) {
 		_getExecutionOutput('which nscd && service nscd reload && service nscd restart');
 	}
 	else if (os == 'darwin') {
-			// get interfaces
-			var interfaces = _getExecutionOutput('networksetup -listallnetworkservices | sed 1,1d');
-			if (loggingEnable == true) console.log('Backing up current DNS servers');
-			// back up current DNS server addresses
-			_execute("ipconfig getpacket en0 | perl -ne'/domain_name_server.*: \{(.*)}/ && print join \" \", split /,\s*/, $1' > /Library/Caches/"+DNSbackupName+".txt");
-			for (x in interfaces) {
-				// set DNS servers, per interface
-				if (loggingEnable == true) console.log("Setting interface:", interfaces[x]);
-				_getExecutionOutput(String('networksetup -setdnsservers "'+interfaces[x]+'"' + DNSservers.join(' ')));
-			}
+		// get interfaces
+		var interfaces = _getExecutionOutput('networksetup -listallnetworkservices | sed 1,1d');
+		interfaces = interfaces.split('\n');
+		if (loggingEnable == true) console.log('Backing up current DNS servers');
+		// back up current DNS server addresses
+		_execute("ipconfig getpacket en0 | perl -ne'/domain_name_server.*: \{(.*)}/ && print join \" \", split /,\s*/, $1' > /Library/Caches/"+DNSbackupName+".txt");
+		for (x in interfaces) {
+			// set DNS servers, per interface
+			if (loggingEnable == true) console.log("Setting interface:", interfaces[x]);
+			if (loggingEnable == true) console.log(String('networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers.join(' ')))
+			_getExecutionOutput(String('networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers.join(' ')));
+		}
 	}
 	else if (os == 'win32') {
-			// get interfaces
-			var interfaces_ethernet = String(_getExecutionOutput('ipconfig | find /i "Ethernet adapter"').trim().split(' ').slice(2)).replace(':','').split(' ');
-			var interfaces_wireless = String(_getExecutionOutput('ipconfig | find /i "Wireless LAN adapter"').trim().split(' ').slice(3)).replace(':','').split(' ');
-			if (loggingEnable == true) console.log('ETHERNET  :', interfaces_ethernet);
-			if (loggingEnable == true) console.log('WIRELESS :', interfaces_wireless);
-			if (/^[0-9a-zA-Z]+$/.test(interfaces_ethernet)) for (x in interfaces_ethernet) {
-				// set DNS servers per ethernet interface
-				if (loggingEnable == true) console.log('Setting ethernet interface:', interfaces_ethernet[x].trim());
-				_execute(String('netsh interface ipv4 set dns name="'+interfaces_ethernet[x]+'" static ' + DNSservers[0] + ' primary'));
-				_execute(String('netsh interface ipv4 add dns name="'+interfaces_ethernet[x]+'" ' + DNSservers[1] + ' index=2'));
-			}
-			if (/^[0-9a-zA-Z]+$/.test(interfaces_wireless)) for (x in interfaces_wireless) {
-				// set DNS servers per wireless interface
-				if (loggingEnable == true) console.log('Setting wireless interface:', interfaces_wireless[x].trim());
-				_execute(String('netsh interface ipv4 set dns name="'+interfaces_wireless[x]+'" static ' + DNSservers[0] + ' primary'));
-				_execute(String('netsh interface ipv4 add dns name="'+interfaces_wireless[x]+'" ' + DNSservers[1] + ' index=2'));
-			}
-			if (loggingEnable == true) console.log('Flushing DNS cache.');
-			// flush DNS cache
-			_getExecutionOutput('ipconfig /flushdns');
+		// get interfaces
+		var interfaces_ethernet = String(_getExecutionOutput('ipconfig | find /i "Ethernet adapter"').trim().split(' ').slice(2)).replace(':','').split(' ');
+		var interfaces_wireless = String(_getExecutionOutput('ipconfig | find /i "Wireless LAN adapter"').trim().split(' ').slice(3)).replace(':','').split(' ');
+		if (loggingEnable == true) console.log('ETHERNET  :', interfaces_ethernet);
+		if (loggingEnable == true) console.log('WIRELESS :', interfaces_wireless);
+		if (/^[0-9a-zA-Z]+$/.test(interfaces_ethernet)) for (x in interfaces_ethernet) {
+			// set DNS servers per ethernet interface
+			if (loggingEnable == true) console.log('Setting ethernet interface:', interfaces_ethernet[x].trim());
+			_execute(String('netsh interface ipv4 set dns name="'+interfaces_ethernet[x]+'" static ' + DNSservers[0] + ' primary'));
+			_execute(String('netsh interface ipv4 add dns name="'+interfaces_ethernet[x]+'" ' + DNSservers[1] + ' index=2'));
+		}
+		if (/^[0-9a-zA-Z]+$/.test(interfaces_wireless)) for (x in interfaces_wireless) {
+			// set DNS servers per wireless interface
+			if (loggingEnable == true) console.log('Setting wireless interface:', interfaces_wireless[x].trim());
+			_execute(String('netsh interface ipv4 set dns name="'+interfaces_wireless[x]+'" static ' + DNSservers[0] + ' primary'));
+			_execute(String('netsh interface ipv4 add dns name="'+interfaces_wireless[x]+'" ' + DNSservers[1] + ' index=2'));
+		}
+		if (loggingEnable == true) console.log('Flushing DNS cache.');
+		// flush DNS cache
+		_getExecutionOutput('ipconfig /flushdns');
 	}
 	else {
-			if (loggingEnable == true) console.log("Error: Unsupported platform. ");
+		if (loggingEnable == true) console.log("Error: Unsupported platform. ");
 	}
 }
 
-function restoreDNSservers({DNSbackupName, loggingEnable}) {
+exports.restoreDNSservers = function({DNSbackupName, loggingEnable}) {
 	// restore DNS from backup per platform
 	if (DNSbackupName === undefined) var DNSbackupName="before-dns-changer";
 	if (os == 'linux') {
@@ -118,10 +128,8 @@ function restoreDNSservers({DNSbackupName, loggingEnable}) {
 			if (loggingEnable == true) throw 'Could not find backed up resolv file.';
 		}
 		// move backup to resolv.conf
-		fs.rename(String('/etc/resolv.conf.'+DNSbackupName), '/etc/resolv.conf', (err) => {
-			if (err) throw err;
-			if (loggingEnable == true) console.log('Renamed file.');
-		});
+		shell.mv(String('/etc/resolv.conf.'+DNSbackupName), '/etc/resolv.conf');
+		if (loggingEnable == true) console.log('Renamed file.');
 		if (loggingEnable == true) console.log('Flushing resolve cache');
 		// flush DNS cache
 		_getExecutionOutput('which systemd-resolve && systemd-resolve --flush-caches');
@@ -129,21 +137,27 @@ function restoreDNSservers({DNSbackupName, loggingEnable}) {
 	}
 	else if (os == 'darwin') {
 		// check if backup file exists
+
 		var DNSservers;
 		if (shell.test('-f', String('/Library/Caches/'+DNSbackupName+'.txt'))) {
 			if (loggingEnable == true) console.log('Found backed up DNS file.');
-			var DNSservers = shell.cat(String('/Library/Caches/'+DNSbackupName+'.txt')).stdout;
+			DNSservers = shell.cat(String('/Library/Caches/'+DNSbackupName+'.txt')).stdout;
 		}
 		else {
 			if (loggingEnable == true) throw console.log('Could not find backed up DNS file.');
 		}
 		// get network interfaces
 		var interfaces = _getExecutionOutput('networksetup -listallnetworkservices | sed 1,1d');
-		if (loggingEnable == true) console.log('Backing up current DNS servers');
+		interfaces = interfaces.split('\n');
+		if (loggingEnable == true) console.log('Restoring DNS servers');
 		for (x in interfaces) {
 			// restore backed up server addresses per interface
-			if (loggingEnable == true) console.log("INTERFACE:", interfaces[x]);
-			_getExecutionOutput('networksetup -setdnsservers "'+interfaces[x]+'"' + DNSservers.join(' '));
+			switch(x) {
+				default:
+					if (loggingEnable == true) console.log("INTERFACE:", interfaces[x]);
+					if (loggingEnable == true) console.log(String('networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers))
+					_getExecutionOutput(String('networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers));
+			}
 		}
 		// remove backup
 		shell.rm(String('/Library/Caches/'+DNSbackupName+'.txt'));
