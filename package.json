@@ -8,6 +8,7 @@
   },
   "author": "Caleb Woodbine <calebwoodbine.public@gmail.com>",
   "license": "GPL-3.0",
+  "repository":"https://gitlab.com/BobyMCbobs/node_dns_changer",
   "dependencies": {
     "callback": "0.0.1",
     "os": "^0.1.1",
