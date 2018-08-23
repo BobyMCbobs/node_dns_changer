@@ -19,7 +19,7 @@
 //
 
 const exec = require('child_process').exec;
-const os = require('os').platform;
+const os = require('os');
 const fs = require('fs');
 const shell = require('shelljs');
 shell.config.silent = true;
@@ -50,7 +50,7 @@ exports.setDNSservers = function({DNSservers, DNSbackupName, loggingEnable}) {
 	if (loggingEnable == true) console.log('Setting DNS servers:', DNSservers);
 	if (DNSservers === undefined) throw "You must include two DNS server addresses";
 	if (DNSbackupName === undefined) var DNSbackupName="before-dns-changer";
-	switch(os) {
+	switch(os.platform()) {
 		case 'linux':
 			// move resolv.conf to another location
 			if (loggingEnable == true) console.log('Backing up resolv.conf');
@@ -116,7 +116,7 @@ exports.setDNSservers = function({DNSservers, DNSbackupName, loggingEnable}) {
 exports.restoreDNSservers = function({DNSbackupName, loggingEnable}) {
 	// restore DNS from backup per platform
 	if (DNSbackupName === undefined) var DNSbackupName="before-dns-changer";
-	switch(os) {
+	switch(os.platform()) {
 		case 'linux':
 			if (loggingEnable == true) console.log('Changing permissions');
 			// make mutable
