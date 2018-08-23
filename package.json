@@ -1,6 +1,6 @@
 {
   "name": "node_dns_changer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A simple NodeJS DNS changer",
   "main": "index.js",
   "scripts": {
@@ -9,6 +9,11 @@
   "author": "Caleb Woodbine <calebwoodbine.public@gmail.com>",
   "license": "GPL-3.0",
   "repository":"https://gitlab.com/BobyMCbobs/node_dns_changer",
+  "keywords": [
+    "dns",
+    "dns changer",
+    "node dns changer"
+  ],
   "dependencies": {
     "callback": "0.0.1",
     "os": "^0.1.1",
