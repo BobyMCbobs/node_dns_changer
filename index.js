@@ -22,6 +22,8 @@ const exec = require('child_process').exec;
 const os = require('os');
 const fs = require('fs');
 const shell = require('shelljs');
+const cmd = require('node-cmd');
+const network = require('network');
 shell.config.silent = true;
 
 var macOSignoreInterfaces = ['iPhone USB', ''];
@@ -36,13 +38,17 @@ function _execute(command){
 function _getExecutionOutput(command) {
 	// return output of a command
 	var usercmd;
-	try {
+	/*try {
 		usercmd = shell.exec(command).stdout;
 	}
 	catch(error) {
 		usercmd = exec(command);
 	}
-	return usercmd;
+	return usercmd;*/
+	cmd.get(command, function(err, data, stderr) {
+		usercmd = data;
+	})
+	return usercmd
 }
 
 exports.setDNSservers = function({DNSservers, DNSbackupName, loggingEnable}) {
@@ -88,25 +94,22 @@ exports.setDNSservers = function({DNSservers, DNSbackupName, loggingEnable}) {
 			break;
 		case 'win32':
 			// get interfaces
-			var interfaces_ethernet = String(_getExecutionOutput('ipconfig | find /i "Ethernet adapter"').trim().split(' ').slice(2)).replace(':','').split(' ');
-			var interfaces_wireless = String(_getExecutionOutput('ipconfig | find /i "Wireless LAN adapter"').trim().split(' ').slice(3)).replace(':','').split(' ');
-			if (loggingEnable == true) console.log('ETHERNET  :', interfaces_ethernet);
-			if (loggingEnable == true) console.log('WIRELESS :', interfaces_wireless);
-			if (/^[0-9a-zA-Z]+$/.test(interfaces_ethernet)) for (x in interfaces_ethernet) {
-				// set DNS servers per ethernet interface
-				if (loggingEnable == true) console.log('Setting ethernet interface:', interfaces_ethernet[x].trim());
-				_execute(String('netsh interface ipv4 set dns name="'+interfaces_ethernet[x]+'" static ' + DNSservers[0] + ' primary'));
-				_execute(String('netsh interface ipv4 add dns name="'+interfaces_ethernet[x]+'" ' + DNSservers[1] + ' index=2'));
-			}
-			if (/^[0-9a-zA-Z]+$/.test(interfaces_wireless)) for (x in interfaces_wireless) {
-				// set DNS servers per wireless interface
-				if (loggingEnable == true) console.log('Setting wireless interface:', interfaces_wireless[x].trim());
-				_execute(String('netsh interface ipv4 set dns name="'+interfaces_wireless[x]+'" static ' + DNSservers[0] + ' primary'));
-				_execute(String('netsh interface ipv4 add dns name="'+interfaces_wireless[x]+'" ' + DNSservers[1] + ' index=2'));
-			}
-			if (loggingEnable == true) console.log('Flushing DNS cache.');
-			// flush DNS cache
-			_getExecutionOutput('ipconfig /flushdns');
+			var interfaces;
+			network.get_interfaces_list(function(err, obj) {
+				interfaces = obj;
+			});
+			setTimeout(function() {
+				if (loggingEnable == true) console.log('INTERFACES: ', interfaces)
+				for (x in interfaces) {
+					// set DNS servers per ethernet interface
+					if (loggingEnable == true) console.log('Setting ethernet interface:', interfaces[x].name);
+					_execute(String('netsh interface ipv4 set dns name="'+interfaces[x].name+'" static ' + DNSservers[0] + ' primary'));
+					_execute(String('netsh interface ipv4 add dns name="'+interfaces[x].name+'" ' + DNSservers[1] + ' index=2'));
+				}
+				if (loggingEnable == true) console.log('Flushing DNS cache.');
+				// flush DNS cache
+				_getExecutionOutput('ipconfig /flushdns');
+			}, 1000);
 			break;
 		default:
 			if (loggingEnable == true) console.log("Error: Unsupported platform. ");
@@ -165,23 +168,21 @@ exports.restoreDNSservers = function({DNSbackupName, loggingEnable}) {
 			break;
 		case 'win32':
 			// get interfaces
-			var interfaces_ethernet = String(_getExecutionOutput('ipconfig | find /i "Ethernet adapter"').trim().split(' ').slice(2)).replace(':','').split(' ');
-			var interfaces_wireless = String(_getExecutionOutput('ipconfig | find /i "Wireless LAN adapter"').trim().split(' ').slice(3)).replace(':','').split(' ');
-			if (loggingEnable == true) console.log('ETHERNET  :', interfaces_ethernet);
-			if (loggingEnable == true) console.log('WIRELESS :', interfaces_wireless);
-			if (/^[0-9a-zA-Z]+$/.test(interfaces_ethernet)) for (x in interfaces_ethernet) {
-				// restore backed up DNS addresses per ethernet interface
-				if (loggingEnable == true) console.log('Setting ethernet interface:', interfaces_ethernet[x]);
-				_execute(String('netsh interface ipv4 set dns name="'+interfaces_ethernet[x]+'" dhcp'));
-			}
-			if (/^[0-9a-zA-Z]+$/.test(interfaces_wireless)) for (x in interfaces_wireless) {
-				// restore backed up DNS addresses per wireless interface
-				if (loggingEnable == true) console.log('Setting wireless interface:', interfaces_wireless[x]);
-				_execute(String('netsh interface ipv4 set dns name="'+interfaces_wireless[x]+'" dhcp'));
-			}
-			if (loggingEnable == true) console.log('Flushing DNS cache.');
-			// flush DNS cache
-			_getExecutionOutput('ipconfig /flushdns');
+			var interfaces;
+			network.get_interfaces_list(function(err, obj) {
+				interfaces = obj;
+			});
+			setTimeout(function() {
+				if (loggingEnable == true) console.log('INTERFACES: ', interfaces)
+				for (x in interfaces) {
+					// set DNS servers per ethernet interface
+					if (loggingEnable == true) console.log('Setting ethernet interface:', interfaces[x].name);
+				_execute(String('netsh interface ipv4 set dns name="'+interfaces[x].name+'" dhcp'));
+				}
+				if (loggingEnable == true) console.log('Flushing DNS cache.');
+				// flush DNS cache
+				_getExecutionOutput('ipconfig /flushdns');
+			}, 1000);
 			break;
 		default:
 			if (loggingEnable == true) console.log('Error: Unsupported platform.')
