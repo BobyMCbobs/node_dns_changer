@@ -28,52 +28,45 @@ shell.config.silent = true;
 
 var macOSignoreInterfaces = ['iPhone USB', ''];
 
-function _execute(command){
+function _execute({command, loggingEnable}){
 	// execute a system command
 	exec(command, function(error, stdout, stderr){
-		console.log(stdout);
+		if (loggingEnable == true) console.log("node_dns_changer::> ",stdout);
 	});
 };
 
 function _getExecutionOutput(command) {
 	// return output of a command
 	var usercmd;
-	/*try {
-		usercmd = shell.exec(command).stdout;
-	}
-	catch(error) {
-		usercmd = exec(command);
-	}
-	return usercmd;*/
 	cmd.get(command, function(err, data, stderr) {
 		usercmd = data;
 	})
-	return usercmd
+	return usercmd;
 }
 
 exports.setDNSservers = function({DNSservers, DNSbackupName, loggingEnable}) {
 	// set a DNS per platform
-	if (loggingEnable == true) console.log('Setting DNS servers:', DNSservers);
+	if (loggingEnable == true) console.log("node_dns_changer::> ",'Setting DNS servers:', DNSservers);
 	if (DNSservers === undefined) throw "You must include two DNS server addresses";
 	if (DNSbackupName === undefined) var DNSbackupName="before-dns-changer";
 	switch(os.platform()) {
 		case 'linux':
 			// move resolv.conf to another location
-			if (loggingEnable == true) console.log('Backing up resolv.conf');
+			if (loggingEnable == true) console.log("node_dns_changer::> ",'Backing up resolv.conf');
 			fs.rename('/etc/resolv.conf', String('/etc/resolv.conf.'+DNSbackupName), (err) => {
 				if (err) throw err;
-				if (loggingEnable == true) console.log('Renamed file.');
+				if (loggingEnable == true) console.log("node_dns_changer::> ",'Renamed file.');
 			});
-			if (loggingEnable == true) console.log('Writing resolv.conf');
+			if (loggingEnable == true) console.log("node_dns_changer::> ",'Writing resolv.conf');
 			// write new DNS server config
 			fs.writeFile('/etc/resolv.conf', String("nameserver "+DNSservers[0]+'\n'+"nameserver "+DNSservers[1]+'\n'), function (err) {
 				if (err) throw err;
-				if (loggingEnable == true) console.log('Saved file.');
+				if (loggingEnable == true) console.log("node_dns_changer::> ",'Saved file.');
 			});
-			if (loggingEnable == true) console.log('Changing permissions');
+			if (loggingEnable == true) console.log("node_dns_changer::> ",'Changing permissions');
 			// make resolv.conf immutable
 			_execute('chattr +i /etc/resolv.conf');
-			if (loggingEnable == true) console.log('Flushing DNS cache (if systemd-resolve is available).');
+			if (loggingEnable == true) console.log("node_dns_changer::> ",'Flushing DNS cache (if systemd-resolve is available).');
 			// flush DNS cache
 			_getExecutionOutput('which systemd-resolve && systemd-resolve --flush-caches');
 			_getExecutionOutput('which nscd && service nscd reload && service nscd restart');
@@ -82,13 +75,13 @@ exports.setDNSservers = function({DNSservers, DNSbackupName, loggingEnable}) {
 			// get interfaces
 			var interfaces = _getExecutionOutput('networksetup -listallnetworkservices | sed 1,1d');
 			interfaces = interfaces.split('\n');
-			if (loggingEnable == true) console.log('Backing up current DNS servers');
+			if (loggingEnable == true) console.log("node_dns_changer::> ",'Backing up current DNS servers');
 			// back up current DNS server addresses
 			_execute("ipconfig getpacket en0 | perl -ne'/domain_name_server.*: \{(.*)}/ && print join \" \", split /,\s*/, $1' > /Library/Caches/"+DNSbackupName+".txt");
 			for (x in interfaces) {
 				// set DNS servers, per interface
-				if (loggingEnable == true) console.log("Setting interface:", interfaces[x]);
-				if (loggingEnable == true) console.log(String('networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers.join(' ')))
+				if (loggingEnable == true) console.log("node_dns_changer::> ","Setting interface:", interfaces[x]);
+				if (loggingEnable == true) console.log(String("node_dns_changer::> "+'networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers.join(' ')))
 				_getExecutionOutput(String('networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers.join(' ')));
 			}
 			break;
@@ -99,20 +92,20 @@ exports.setDNSservers = function({DNSservers, DNSbackupName, loggingEnable}) {
 				interfaces = obj;
 			});
 			setTimeout(function() {
-				if (loggingEnable == true) console.log('INTERFACES: ', interfaces)
+				if (loggingEnable == true) console.log("node_dns_changer::> ",'INTERFACES: ', interfaces)
 				for (x in interfaces) {
 					// set DNS servers per ethernet interface
-					if (loggingEnable == true) console.log('Setting ethernet interface:', interfaces[x].name);
-					_execute(String('netsh interface ipv4 set dns name="'+interfaces[x].name+'" static ' + DNSservers[0] + ' primary'));
-					_execute(String('netsh interface ipv4 add dns name="'+interfaces[x].name+'" ' + DNSservers[1] + ' index=2'));
+					if (loggingEnable == true) console.log("node_dns_changer::> ",'Setting ethernet interface:', interfaces[x].name);
+					_getExecutionOutput(String('netsh interface ipv4 set dns name="'+interfaces[x].name+'" static ' + DNSservers[0] + ' primary'));
+					_getExecutionOutput(String('netsh interface ipv4 add dns name="'+interfaces[x].name+'" ' + DNSservers[1] + ' index=2'));
 				}
-				if (loggingEnable == true) console.log('Flushing DNS cache.');
+				if (loggingEnable == true) console.log("node_dns_changer::> ",'Flushing DNS cache.');
 				// flush DNS cache
 				_getExecutionOutput('ipconfig /flushdns');
 			}, 1000);
 			break;
 		default:
-			if (loggingEnable == true) console.log("Error: Unsupported platform. ");
+			if (loggingEnable == true) console.log("node_dns_changer::> ","Error: Unsupported platform. ");
 	}
 }
 
@@ -121,21 +114,21 @@ exports.restoreDNSservers = function({DNSbackupName, loggingEnable}) {
 	if (DNSbackupName === undefined) var DNSbackupName="before-dns-changer";
 	switch(os.platform()) {
 		case 'linux':
-			if (loggingEnable == true) console.log('Changing permissions');
+			if (loggingEnable == true) console.log("node_dns_changer::> ",'Changing permissions');
 			// make mutable
 			_execute('chattr -i /etc/resolv.conf');
-			if (loggingEnable == true) console.log('Moving resolv.conf')
+			if (loggingEnable == true) console.log("node_dns_changer::> ",'Moving resolv.conf')
 			// check if resolv.conf exists
 			if (shell.test('-f', String('/etc/resolv.conf.'+DNSbackupName))) {
-				if (loggingEnable == true) console.log('Found backed up resolv file.');
+				if (loggingEnable == true) console.log("node_dns_changer::> ",'Found backed up resolv file.');
 			}
 			else {
 				if (loggingEnable == true) throw 'Could not find backed up resolv file.';
 			}
 			// move backup to resolv.conf
 			shell.mv(String('/etc/resolv.conf.'+DNSbackupName), '/etc/resolv.conf');
-			if (loggingEnable == true) console.log('Renamed file.');
-			if (loggingEnable == true) console.log('Flushing resolve cache');
+			if (loggingEnable == true) console.log("node_dns_changer::> ",'Renamed file.');
+			if (loggingEnable == true) console.log("node_dns_changer::> ",'Flushing resolve cache');
 			// flush DNS cache
 			_getExecutionOutput('which systemd-resolve && systemd-resolve --flush-caches');
 			_getExecutionOutput('which nscd && service nscd reload && service nscd restart');
@@ -144,22 +137,22 @@ exports.restoreDNSservers = function({DNSbackupName, loggingEnable}) {
 			// check if backup file exists
 			var DNSservers;
 			if (shell.test('-f', String('/Library/Caches/'+DNSbackupName+'.txt'))) {
-				if (loggingEnable == true) console.log('Found backed up DNS file.');
+				if (loggingEnable == true) console.log("node_dns_changer::> ",'Found backed up DNS file.');
 				DNSservers = shell.cat(String('/Library/Caches/'+DNSbackupName+'.txt')).stdout;
 			}
 			else {
-				if (loggingEnable == true) throw console.log('Could not find backed up DNS file.');
+				if (loggingEnable == true) throw console.log("node_dns_changer::> ",'Could not find backed up DNS file.');
 			}
 			// get network interfaces
 			var interfaces = _getExecutionOutput('networksetup -listallnetworkservices | sed 1,1d');
 			interfaces = interfaces.split('\n');
-			if (loggingEnable == true) console.log('Restoring DNS servers');
+			if (loggingEnable == true) console.log("node_dns_changer::> ",'Restoring DNS servers');
 			for (x in interfaces) {
 				// restore backed up server addresses per interface
 				switch(x) {
 					default:
-						if (loggingEnable == true) console.log("INTERFACE:", interfaces[x]);
-						if (loggingEnable == true) console.log(String('networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers))
+						if (loggingEnable == true) console.log("node_dns_changer::> ","INTERFACE:", interfaces[x]);
+						if (loggingEnable == true) console.log(String("node_dns_changer::> "+'networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers))
 						_getExecutionOutput(String('networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers));
 				}
 			}
@@ -173,18 +166,18 @@ exports.restoreDNSservers = function({DNSbackupName, loggingEnable}) {
 				interfaces = obj;
 			});
 			setTimeout(function() {
-				if (loggingEnable == true) console.log('INTERFACES: ', interfaces)
+				if (loggingEnable == true) console.log("node_dns_changer::> ",'INTERFACES: ', interfaces)
 				for (x in interfaces) {
 					// set DNS servers per ethernet interface
 					if (loggingEnable == true) console.log('Setting ethernet interface:', interfaces[x].name);
-				_execute(String('netsh interface ipv4 set dns name="'+interfaces[x].name+'" dhcp'));
+				_getExecutionOutput(String('netsh interface ipv4 set dns name="'+interfaces[x].name+'" dhcp'));
 				}
-				if (loggingEnable == true) console.log('Flushing DNS cache.');
+				if (loggingEnable == true) console.log("node_dns_changer::> ",'Flushing DNS cache.');
 				// flush DNS cache
 				_getExecutionOutput('ipconfig /flushdns');
 			}, 1000);
 			break;
 		default:
-			if (loggingEnable == true) console.log('Error: Unsupported platform.')
+			if (loggingEnable == true) console.log("node_dns_changer::> ",'Error: Unsupported platform.')
 	}
 }
