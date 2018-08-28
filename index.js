@@ -90,8 +90,6 @@ exports.setDNSservers = function({DNSservers, DNSbackupName, loggingEnable}) {
 			var interfaces;
 			network.get_interfaces_list(function(err, obj) {
 				interfaces = obj;
-			});
-			setTimeout(function() {
 				if (loggingEnable == true) console.log("node_dns_changer::> ",'INTERFACES: ', interfaces)
 				for (x in interfaces) {
 					// set DNS servers per ethernet interface
@@ -102,7 +100,7 @@ exports.setDNSservers = function({DNSservers, DNSbackupName, loggingEnable}) {
 				if (loggingEnable == true) console.log("node_dns_changer::> ",'Flushing DNS cache.');
 				// flush DNS cache
 				_getExecutionOutput('ipconfig /flushdns');
-			}, 1000);
+			});
 			break;
 		default:
 			if (loggingEnable == true) console.log("node_dns_changer::> ","Error: Unsupported platform. ");
@@ -164,8 +162,6 @@ exports.restoreDNSservers = function({DNSbackupName, loggingEnable}) {
 			var interfaces;
 			network.get_interfaces_list(function(err, obj) {
 				interfaces = obj;
-			});
-			setTimeout(function() {
 				if (loggingEnable == true) console.log("node_dns_changer::> ",'INTERFACES: ', interfaces)
 				for (x in interfaces) {
 					// set DNS servers per ethernet interface
@@ -175,7 +171,7 @@ exports.restoreDNSservers = function({DNSbackupName, loggingEnable}) {
 				if (loggingEnable == true) console.log("node_dns_changer::> ",'Flushing DNS cache.');
 				// flush DNS cache
 				_getExecutionOutput('ipconfig /flushdns');
-			}, 1000);
+			});
 			break;
 		default:
 			if (loggingEnable == true) console.log("node_dns_changer::> ",'Error: Unsupported platform.')
