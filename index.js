@@ -18,21 +18,18 @@
 // Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 //
 
-const exec = require('child_process').exec;
-const os = require('os');
-const fs = require('fs');
-const shell = require('shelljs');
-const cmd = require('node-cmd');
-const network = require('network');
+const exec = require('child_process').exec,
+ os = require('os'),
+ fs = require('fs'),
+ shell = require('shelljs'),
+ cmd = require('node-cmd'),
+ network = require('network');
 shell.config.silent = true;
 
-var macOSignoreInterfaces = ['iPhone USB', ''];
+var macOSignoreInterfaces = ['iPhone USB', 'Bluetooth PAN', 'Thunderbolt Bridge', 'lo0', ''];
 
 function _execute({command, loggingEnable}){
-	// execute a system command
-	exec(command, function(error, stdout, stderr){
-		if (loggingEnable == true) console.log("node_dns_changer::> ",stdout);
-	});
+	require('child_process').exec(command);
 };
 
 function _getExecutionOutput(command) {
@@ -73,17 +70,26 @@ exports.setDNSservers = function({DNSservers, DNSbackupName, loggingEnable}) {
 			break;
 		case 'darwin':
 			// get interfaces
-			var interfaces = _getExecutionOutput('networksetup -listallnetworkservices | sed 1,1d');
-			interfaces = interfaces.split('\n');
-			if (loggingEnable == true) console.log("node_dns_changer::> ",'Backing up current DNS servers');
-			// back up current DNS server addresses
-			_execute("ipconfig getpacket en0 | perl -ne'/domain_name_server.*: \{(.*)}/ && print join \" \", split /,\s*/, $1' > /Library/Caches/"+DNSbackupName+".txt");
-			for (x in interfaces) {
-				// set DNS servers, per interface
-				if (loggingEnable == true) console.log("node_dns_changer::> ","Setting interface:", interfaces[x]);
-				if (loggingEnable == true) console.log(String("node_dns_changer::> "+'networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers.join(' ')))
-				_getExecutionOutput(String('networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers.join(' ')));
-			}
+			var interfaces = [];
+			cmd.get('networksetup -listallnetworkservices | sed 1,1d', function(err, data, stderr) {
+				var interfaces = data;
+				interfaces = interfaces.split('\n');
+				if (loggingEnable == true) console.log("node_dns_changer::> ",'Backing up current DNS servers');
+				// back up current DNS server addresses
+				_getExecutionOutput("scutil --dns | grep 'nameserver\[[0-9]*\]' | head -n 1 | tail -n 1 | cut -d ':' -f2 > /Library/Caches/"+DNSbackupName+".txt");
+				_getExecutionOutput("scutil --dns | grep 'nameserver\[[0-9]*\]' | head -n 2 | tail -n 1 | cut -d ':' -f2 >> /Library/Caches/"+DNSbackupName+".txt");
+				for (x in interfaces) {
+					// set DNS servers, per interface
+					if (!(macOSignoreInterfaces.indexOf(interfaces[x]) > -1)) {
+						if (loggingEnable == true) console.log("node_dns_changer::> ","Setting interface:", interfaces[x]);
+						if (loggingEnable == true) console.log(String("node_dns_changer::> "+'networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers.join(' ')))
+						_getExecutionOutput(String('networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers.join(' ')));
+					}
+					else {
+						if (loggingEnable == true) console.log(String("Ignoring interface: '" + interfaces[x] + "'"));
+					}
+				}
+			});
 			break;
 		case 'win32':
 			// get interfaces
@@ -133,29 +139,37 @@ exports.restoreDNSservers = function({DNSbackupName, loggingEnable}) {
 			break;
 		case 'darwin':
 			// check if backup file exists
+			var interfaces = [];
 			var DNSservers;
 			if (shell.test('-f', String('/Library/Caches/'+DNSbackupName+'.txt'))) {
 				if (loggingEnable == true) console.log("node_dns_changer::> ",'Found backed up DNS file.');
 				DNSservers = shell.cat(String('/Library/Caches/'+DNSbackupName+'.txt')).stdout;
+				DNSservers = DNSservers.split('\n');
+				DNSservers = DNSservers.join(' ');
 			}
 			else {
 				if (loggingEnable == true) throw console.log("node_dns_changer::> ",'Could not find backed up DNS file.');
 			}
 			// get network interfaces
-			var interfaces = _getExecutionOutput('networksetup -listallnetworkservices | sed 1,1d');
-			interfaces = interfaces.split('\n');
-			if (loggingEnable == true) console.log("node_dns_changer::> ",'Restoring DNS servers');
-			for (x in interfaces) {
-				// restore backed up server addresses per interface
-				switch(x) {
-					default:
-						if (loggingEnable == true) console.log("node_dns_changer::> ","INTERFACE:", interfaces[x]);
-						if (loggingEnable == true) console.log(String("node_dns_changer::> "+'networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers))
-						_getExecutionOutput(String('networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers));
+			cmd.get('networksetup -listallnetworkservices | sed 1,1d', function(err, data, stderr) {
+				var interfaces = data;
+				interfaces = interfaces.split('\n');
+				if ('\n' in interfaces) interfaces = interfaces.split('\n');
+				if (loggingEnable == true) console.log("node_dns_changer::> ",'Restoring DNS servers');
+				for (x in interfaces) {
+					// restore backed up server addresses per interface
+					if (!(macOSignoreInterfaces.indexOf(interfaces[x]) > -1)) {
+							if (loggingEnable == true) console.log("node_dns_changer::> ","INTERFACE:", interfaces[x]);
+							if (loggingEnable == true) console.log(String("node_dns_changer::> "+'networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers))
+							_getExecutionOutput(String('networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers));
+					}
+					else {
+						if (loggingEnable == true) console.log(String("Ignoring interface: '" + interfaces[x] + "'"));
+					}
 				}
-			}
-			// remove backup
-			shell.rm(String('/Library/Caches/'+DNSbackupName+'.txt'));
+				// remove backup
+				shell.rm(String('/Library/Caches/'+DNSbackupName+'.txt'));
+			});
 			break;
 		case 'win32':
 			// get interfaces
