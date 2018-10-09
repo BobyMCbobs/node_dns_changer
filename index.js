@@ -100,8 +100,7 @@ exports.setDNSservers = function({DNSservers, DNSbackupName, loggingEnable}) {
 				for (x in interfaces) {
 					// set DNS servers per ethernet interface
 					if (loggingEnable == true) console.log("node_dns_changer::> ",'Setting ethernet interface:', interfaces[x].name);
-					_getExecutionOutput(String('netsh interface ipv4 set dns name="'+interfaces[x].name+'" static ' + DNSservers[0] + ' primary'));
-					_getExecutionOutput(String('netsh interface ipv4 add dns name="'+interfaces[x].name+'" ' + DNSservers[1] + ' index=2'));
+					_getExecutionOutput(String('powershell Set-DnsClientServerAddress -InterfaceAlias "'+interfaces[x].name+'" -ServerAddresses "' + DNSservers[0] + "," + DNSservers[1] + '"'));
 				}
 				if (loggingEnable == true) console.log("node_dns_changer::> ",'Flushing DNS cache.');
 				// flush DNS cache
@@ -180,7 +179,7 @@ exports.restoreDNSservers = function({DNSbackupName, loggingEnable}) {
 				for (x in interfaces) {
 					// set DNS servers per ethernet interface
 					if (loggingEnable == true) console.log('Setting ethernet interface:', interfaces[x].name);
-				_getExecutionOutput(String('netsh interface ipv4 set dns name="'+interfaces[x].name+'" dhcp'));
+				_getExecutionOutput(String('powershell Set-DnsClientServerAddress -InterfaceAlias "'+interfaces[x].name+'" -ResetServerAddresses '));
 				}
 				if (loggingEnable == true) console.log("node_dns_changer::> ",'Flushing DNS cache.');
 				// flush DNS cache
