@@ -11,7 +11,9 @@ A multiplatform (Linux, Windows, macOS) DNS library for changing DNS servers wri
 		- openSUSE Leap 15
 		- Ubuntu 18.04
 		- Fedora 28
-	- Windows 10
+	- Windows
+	    - 7 (SP1)
+	    - 10 (1803, 1809)
 	- macOS El Capitan
 
 ## Installing

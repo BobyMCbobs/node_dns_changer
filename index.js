@@ -41,6 +41,17 @@ function _getExecutionOutput(command) {
 	return usercmd;
 }
 
+function _determinePowershellOrNetsh() {
+  // if version is Windows 7 or below use netsh
+  var releaseVer = os.release().split('.');
+  if (parseInt(releaseVer[0]) <= 6 && parseInt(releaseVer[1]) <= 1 || (parseInt(releaseVer[0]) == 5)) {
+    // use netsh
+    return true;
+  }
+  // use powershell
+  return false;
+}
+
 exports.setDNSservers = function({DNSservers, DNSbackupName, loggingEnable}) {
 	// set a DNS per platform
 	if (loggingEnable == true) console.log("node_dns_changer::> ",'Setting DNS servers:', DNSservers);
@@ -100,7 +111,16 @@ exports.setDNSservers = function({DNSservers, DNSbackupName, loggingEnable}) {
 				for (x in interfaces) {
 					// set DNS servers per ethernet interface
 					if (loggingEnable == true) console.log("node_dns_changer::> ",'Setting ethernet interface:', interfaces[x].name);
-					_getExecutionOutput(String('powershell Set-DnsClientServerAddress -InterfaceAlias "'+interfaces[x].name+'" -ServerAddresses "' + DNSservers[0] + "," + DNSservers[1] + '"'));
+					switch(_determinePowershellOrNetsh()) {
+					  case true:
+              _getExecutionOutput(String('netsh interface ipv4 set dns name="'+interfaces[x].name+'" static ' + DNSservers[0] + ' primary'));
+					    _getExecutionOutput(String('netsh interface ipv4 add dns name="'+interfaces[x].name+'" ' + DNSservers[1] + ' index=2'));
+					    break;
+
+					  default:
+					    _getExecutionOutput(String('powershell Set-DnsClientServerAddress -InterfaceAlias "'+interfaces[x].name+'" -ServerAddresses "' + DNSservers[0] + "," + DNSservers[1] + '"'));
+					    break;
+					}
 				}
 				if (loggingEnable == true) console.log("node_dns_changer::> ",'Flushing DNS cache.');
 				// flush DNS cache
@@ -179,7 +199,15 @@ exports.restoreDNSservers = function({DNSbackupName, loggingEnable}) {
 				for (x in interfaces) {
 					// set DNS servers per ethernet interface
 					if (loggingEnable == true) console.log('Setting ethernet interface:', interfaces[x].name);
-				_getExecutionOutput(String('powershell Set-DnsClientServerAddress -InterfaceAlias "'+interfaces[x].name+'" -ResetServerAddresses '));
+				  switch(_determinePowershellOrNetsh()) {
+					  case true:
+              _getExecutionOutput(String('netsh interface ipv4 set dns name="'+interfaces[x].name+'" dhcp'));
+					    break;
+
+					  default:
+					    _getExecutionOutput(String('powershell Set-DnsClientServerAddress -InterfaceAlias "'+interfaces[x].name+'" -ResetServerAddresses '));
+					    break;
+					}
 				}
 				if (loggingEnable == true) console.log("node_dns_changer::> ",'Flushing DNS cache.');
 				// flush DNS cache
