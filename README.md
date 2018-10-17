@@ -35,7 +35,8 @@ dns_changer.setDNSservers({
 // restore settings with logging enabled
 dns_changer.restoreDNSservers({
 	DNSbackupName:'dnsBackup',
-	loggingEnable:true
+	loggingEnable:true,
+	rmBackup: true
 });
 
 // setup DNS servers without a custom backup name
