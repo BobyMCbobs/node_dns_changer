@@ -1,2 +1,2 @@
 slim:
-	rm -r node_modules
+	rm -rf node_modules

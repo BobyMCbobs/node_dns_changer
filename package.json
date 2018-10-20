@@ -1,6 +1,6 @@
 {
   "name": "node_dns_changer",
-  "version": "1.0.9",
+  "version": "1.1.0",
   "description": "A simple NodeJS DNS changer",
   "main": "index.js",
   "scripts": {
@@ -15,11 +15,10 @@
     "node dns changer"
   ],
   "dependencies": {
-    "callback": "0.0.1",
+    "is-admin": "^2.1.1",
     "network": "^0.4.1",
     "node-cmd": "^3.0.0",
     "os": "^0.1.1",
-    "shelljs": "^0.8.2",
-    "systeminformation": "^3.45.6"
+    "shelljs": "^0.8.2"
   }
 }

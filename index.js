@@ -25,20 +25,21 @@ const exec = require('child_process').exec,
  network = require('network');
 shell.config.silent = true;
 
-var macOSignoreInterfaces = ['iPhone USB', 'Bluetooth PAN', 'Thunderbolt Bridge', 'lo0', ''];
+var macOSignoreInterfaces = ['iPhone USB', 'Bluetooth PAN', 'Thunderbolt Bridge', 'lo0', ''],
+  logging = false;
 
-function _execute({command, loggingEnable}){
-	require('child_process').exec(command);
-};
-
-function _getExecutionOutput(command) {
+/*async function _getExecutionOutput(command) {
 	// return output of a command
-	var usercmd;
-	cmd.get(command, function(err, data, stderr) {
-		usercmd = data;
-	})
-	return usercmd;
-}
+  let promise = new Promise((resolve, reject) => {
+    var usercmd;
+    cmd.get(command, function(err, data, stderr) {
+	    usercmd = data;
+	    resolve(true);
+    });
+	});
+  let result = await promise;
+  return result;
+}*/
 
 function _determinePowershellOrNetsh() {
   // if version is Windows 7 or below use netsh
@@ -51,169 +52,286 @@ function _determinePowershellOrNetsh() {
   return false;
 }
 
-exports.setDNSservers = function({DNSservers, DNSbackupName, loggingEnable}) {
-	// set a DNS per platform
-	if (loggingEnable == true) console.log("node_dns_changer::> ",'Setting DNS servers:', DNSservers);
-	if (DNSservers === undefined) throw "You must include two DNS server addresses";
-	if (DNSbackupName === undefined) var DNSbackupName="before-dns-changer";
-	switch(os.platform()) {
-		case 'linux':
-			// move resolv.conf to another location
-			if (loggingEnable == true) console.log("node_dns_changer::> ",'Backing up resolv.conf');
-			fs.rename('/etc/resolv.conf', String('/etc/resolv.conf.'+DNSbackupName), (err) => {
-				if (err) throw err;
-				if (loggingEnable == true) console.log("node_dns_changer::> ",'Renamed file.');
-			});
-			if (loggingEnable == true) console.log("node_dns_changer::> ",'Writing resolv.conf');
-			// write new DNS server config
-			fs.writeFile('/etc/resolv.conf', String("nameserver "+DNSservers[0]+'\n'+"nameserver "+DNSservers[1]+'\n'), function (err) {
-				if (err) throw err;
-				if (loggingEnable == true) console.log("node_dns_changer::> ",'Saved file.');
-			});
-			if (loggingEnable == true) console.log("node_dns_changer::> ",'Changing permissions');
-			// make resolv.conf immutable
-			_execute('chattr +i /etc/resolv.conf');
-			if (loggingEnable == true) console.log("node_dns_changer::> ",'Flushing DNS cache (if systemd-resolve is available).');
-			// flush DNS cache
-			_getExecutionOutput('which systemd-resolve && systemd-resolve --flush-caches');
-			_getExecutionOutput('which nscd && service nscd reload && service nscd restart');
-			break;
-		case 'darwin':
-			// get interfaces
-			var interfaces = [];
-			cmd.get('networksetup -listallnetworkservices | sed 1,1d', function(err, data, stderr) {
-				var interfaces = data;
-				interfaces = interfaces.split('\n');
-				if (loggingEnable == true) console.log("node_dns_changer::> ",'Backing up current DNS servers');
-				// back up current DNS server addresses
-				_getExecutionOutput("scutil --dns | grep 'nameserver\[[0-9]*\]' | head -n 1 | tail -n 1 | cut -d ':' -f2 > /Library/Caches/"+DNSbackupName+".txt");
-				_getExecutionOutput("scutil --dns | grep 'nameserver\[[0-9]*\]' | head -n 2 | tail -n 1 | cut -d ':' -f2 >> /Library/Caches/"+DNSbackupName+".txt");
-				for (x in interfaces) {
-					// set DNS servers, per interface
-					if (!(macOSignoreInterfaces.indexOf(interfaces[x]) > -1)) {
-						if (loggingEnable == true) console.log("node_dns_changer::> ","Setting interface:", interfaces[x]);
-						if (loggingEnable == true) console.log(String("node_dns_changer::> "+'networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers.join(' ')))
-						_getExecutionOutput(String('networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers.join(' ')));
-					}
-					else {
-						if (loggingEnable == true) console.log(String("Ignoring interface: '" + interfaces[x] + "'"));
-					}
-				}
-			});
-			break;
-		case 'win32':
-			// get interfaces
-			var interfaces;
-			network.get_interfaces_list(function(err, obj) {
-				interfaces = obj;
-				if (loggingEnable == true) console.log("node_dns_changer::> ",'INTERFACES: ', interfaces)
-				for (x in interfaces) {
-					// set DNS servers per ethernet interface
-					if (loggingEnable == true) console.log("node_dns_changer::> ",'Setting ethernet interface:', interfaces[x].name);
-					switch(_determinePowershellOrNetsh()) {
-					  case true:
-              _getExecutionOutput(String('netsh interface ipv4 set dns name="'+interfaces[x].name+'" static ' + DNSservers[0] + ' primary'));
-					    _getExecutionOutput(String('netsh interface ipv4 add dns name="'+interfaces[x].name+'" ' + DNSservers[1] + ' index=2'));
-					    break;
-
-					  default:
-					    _getExecutionOutput(String('powershell Set-DnsClientServerAddress -InterfaceAlias "'+interfaces[x].name+'" -ServerAddresses "' + DNSservers[0] + "," + DNSservers[1] + '"'));
-					    break;
-					}
-				}
-				if (loggingEnable == true) console.log("node_dns_changer::> ",'Flushing DNS cache.');
-				// flush DNS cache
-				_getExecutionOutput('ipconfig /flushdns');
-			});
-			break;
-		default:
-			if (loggingEnable == true) console.log("node_dns_changer::> ","Error: Unsupported platform. ");
-	}
+function _logging(text) {
+  if (logging == true) console.log(text);
 }
 
-exports.restoreDNSservers = function({DNSbackupName, loggingEnable, rmBackup = false}) {
-	// restore DNS from backup per platform
-	if (DNSbackupName === undefined) var DNSbackupName="before-dns-changer";
-	switch(os.platform()) {
-		case 'linux':
-			if (loggingEnable == true) console.log("node_dns_changer::> ",'Changing permissions');
-			// make mutable
-			_execute('chattr -i /etc/resolv.conf');
-			if (loggingEnable == true) console.log("node_dns_changer::> ",'Moving resolv.conf')
-			// check if resolv.conf exists
-			if (shell.test('-f', String('/etc/resolv.conf.'+DNSbackupName))) {
-				if (loggingEnable == true) console.log("node_dns_changer::> ",'Found backed up resolv file.');
-			}
-			else {
-				if (loggingEnable == true) throw 'Could not find backed up resolv file.';
-			}
-			// move backup to resolv.conf
-			shell.mv(String('/etc/resolv.conf.'+DNSbackupName), '/etc/resolv.conf');
-			if (loggingEnable == true) console.log("node_dns_changer::> ",'Renamed file.');
-			if (loggingEnable == true) console.log("node_dns_changer::> ",'Flushing resolve cache');
-			// flush DNS cache
-			_getExecutionOutput('which systemd-resolve && systemd-resolve --flush-caches');
-			_getExecutionOutput('which nscd && service nscd reload && service nscd restart');
-			break;
-		case 'darwin':
-			// check if backup file exists
-			var interfaces = [];
-			var DNSservers;
-			if (shell.test('-f', String('/Library/Caches/'+DNSbackupName+'.txt'))) {
-				if (loggingEnable == true) console.log("node_dns_changer::> ",'Found backed up DNS file.');
-				DNSservers = shell.cat(String('/Library/Caches/'+DNSbackupName+'.txt')).stdout;
-				DNSservers = DNSservers.split('\n');
-				DNSservers = DNSservers.join(' ');
-			}
-			else {
-				if (loggingEnable == true) throw console.log("node_dns_changer::> ",'Could not find backed up DNS file.');
-			}
-			// get network interfaces
-			cmd.get('networksetup -listallnetworkservices | sed 1,1d', function(err, data, stderr) {
-				var interfaces = data;
-				interfaces = interfaces.split('\n');
-				if ('\n' in interfaces) interfaces = interfaces.split('\n');
-				if (loggingEnable == true) console.log("node_dns_changer::> ",'Restoring DNS servers');
-				for (x in interfaces) {
-					// restore backed up server addresses per interface
-					if (!(macOSignoreInterfaces.indexOf(interfaces[x]) > -1)) {
-							if (loggingEnable == true) console.log("node_dns_changer::> ","INTERFACE:", interfaces[x]);
-							if (loggingEnable == true) console.log(String("node_dns_changer::> "+'networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers))
-							_getExecutionOutput(String('networksetup -setdnsservers "'+interfaces[x]+'" ' + DNSservers));
-					}
-					else {
-						if (loggingEnable == true) console.log(String("Ignoring interface: '" + interfaces[x] + "'"));
-					}
-				}
-				// remove backup
-				if (rmBackup == true) shell.rm(String('/Library/Caches/'+DNSbackupName+'.txt'));
-			});
-			break;
-		case 'win32':
-			// get interfaces
-			var interfaces;
-			network.get_interfaces_list(function(err, obj) {
-				interfaces = obj;
-				if (loggingEnable == true) console.log("node_dns_changer::> ",'INTERFACES: ', interfaces)
-				for (x in interfaces) {
-					// set DNS servers per ethernet interface
-					if (loggingEnable == true) console.log('Setting ethernet interface:', interfaces[x].name);
-				  switch(_determinePowershellOrNetsh()) {
-					  case true:
-              _getExecutionOutput(String('netsh interface ipv4 set dns name="'+interfaces[x].name+'" dhcp'));
-					    break;
+function _handleServerAddresses(DNSservers) {
+  // if input is a string, convert it to an array of strings
+  if (typeof DNSservers === 'string') {
+    if ((" " in DNSservers)) return DNSservers.split(' ');
+    else {
+      throw "A space must be in DNSservers if it's a string"; return;
+    }
+  }
+  else if (typeof DNSservers === 'object') return DNSservers;
+}
 
-					  default:
-					    _getExecutionOutput(String('powershell Set-DnsClientServerAddress -InterfaceAlias "'+interfaces[x].name+'" -ResetServerAddresses '));
-					    break;
-					}
-				}
-				if (loggingEnable == true) console.log("node_dns_changer::> ",'Flushing DNS cache.');
-				// flush DNS cache
-				_getExecutionOutput('ipconfig /flushdns');
-			});
-			break;
-		default:
-			if (loggingEnable == true) console.log("node_dns_changer::> ",'Error: Unsupported platform.')
-	}
+function _checkVars({DNSservers, DNSbackupName, loggingEnable, mkBackup}) {
+  if (typeof DNSservers !== 'object' && typeof DNSservers !== 'undefined') {
+    throw "DNSservers must be an object";
+    return;
+  }
+
+  if (typeof DNSservers === 'object') DNSservers.map((i) => {if (typeof i !== 'string') {
+    throw "DNSservers[*] must be strings";
+    return;
+  }});
+
+  if (typeof DNSbackupName !== 'string') {
+    throw "DNSbackupName must be a string";
+    return;
+  }
+
+  if (typeof loggingEnable !== 'boolean') {
+    throw "loggingEnable must be a boolean";
+    return;
+  }
+
+  if (typeof mkBackup !== 'boolean' && typeof mkBackup !== 'undefined') {
+    throw "mkBackup must be a boolean";
+    return;
+  }
+
+  if (typeof rmBackup !== 'boolean' && typeof rmBackup !== 'undefined') {
+    throw "rmBackup must be a boolean";
+    return;
+  }
+}
+
+exports.setDNSservers = async function({DNSservers, DNSbackupName = "before-dns-changer", loggingEnable = false, mkBackup = true}) {
+	// set a DNS per platform
+	DNSservers = _handleServerAddresses(DNSservers);
+	_checkVars({DNSservers, DNSbackupName, loggingEnable, mkBackup});
+  let promise = new Promise((resolve, reject) => {
+	  logging = loggingEnable;
+	  _logging(`node_dns_changer::> Setting DNS servers: ${DNSservers}`);
+	  if (DNSservers === undefined) throw "You must include two DNS server addresses";
+	  switch(os.platform()) {
+		  case 'linux':
+		    if (os.userInfo().uid != 0) {
+		      throw "ERROR: User must be root to change DNS settings";
+		      resolve(false);
+		      return;
+		    }
+		    if (mkBackup == true) {
+			    // move resolv.conf to another location
+			    _logging("node_dns_changer::> Backing up resolv.conf");
+			    shell.cp('-f','/etc/resolv.conf', `/etc/resolv.conf.${DNSbackupName}`);
+			    resolve(false);
+			  }
+			  _logging("node_dns_changer::> Writing resolv.conf");
+			  // write new DNS server config
+			  fs.writeFile('/etc/resolv.conf', `#GENERATED BY node_dns_changer\nnameserver ${DNSservers[0]}\nnameserver ${DNSservers[1]}\n`, function (err) {
+				  if (err) throw err;
+				  _logging("node_dns_changer::> Backed up DNS.");
+				  resolve(false);
+			  });
+			  _logging("node_dns_changer::> Changing permissions");
+			  // make resolv.conf immutable
+			  shell.exec('chattr +i /etc/resolv.conf');
+			  _logging("node_dns_changer::> Flushing DNS cache (if systemd-resolve is available).");
+			  // flush DNS cache
+			  shell.exec('which systemd-resolve && systemd-resolve --flush-caches');
+			  shell.exec('which nscd && service nscd reload && service nscd restart');
+			  resolve(true);
+			  break;
+
+		  case 'darwin':
+			  // get interfaces
+			  var interfaces = [];
+			  cmd.get('networksetup -listallnetworkservices | sed 1,1d', function(err, data, stderr) {
+				  var interfaces = data;
+				  interfaces = interfaces.split('\n');
+				  if (mkBackup == true) {
+				    _logging("node_dns_changer::> Backing up current DNS servers");
+				    // back up current DNS server addresses
+				    shell.exec(`scutil --dns | grep 'nameserver\[[0-9]*\]' | head -n 1 | tail -n 1 | cut -d ':' -f2 > /Library/Caches/${DNSbackupName}.txt`);
+				    shell.exec(`scutil --dns | grep 'nameserver\[[0-9]*\]' | head -n 2 | tail -n 1 | cut -d ':' -f2 >> /Library/Caches/${DNSbackupName}.txt`);
+				  }
+				  for (x in interfaces) {
+					  // set DNS servers, per interface
+					  if (!(macOSignoreInterfaces.indexOf(interfaces[x]) > -1)) {
+						  _logging(`node_dns_changer::> Setting interface: ${interfaces[x]}`);
+						  _logging(`node_dns_changer::> networksetup -setdnsservers ${interfaces[x]} ${DNSservers.join(' ')}`);
+						  shell.exec(`networksetup -setdnsservers ${interfaces[x]} ${DNSservers.join(' ')}`);
+					  }
+					  else {
+						  _logging(`Ignoring interface: ${interfaces[x]}`);
+					  }
+				  }
+				  resolve(true);
+			  });
+			  break;
+
+		  case 'win32':
+		    // check if user is admin
+			  require('is-admin')().then(admin => {
+			    if (admin == false) {
+			      throw "Administator privilege are required to change DNS settings";
+			      return;
+			    }
+			  });
+			  // get interfaces
+			  var interfaces;
+			  network.get_interfaces_list(function(err, obj) {
+				  interfaces = obj;
+				  _logging(`node_dns_changer::> INTERFACES: ${JSON.stringify(interfaces)}`);
+				  for (x in interfaces) {
+					  // set DNS servers per ethernet interface
+					  _logging(`node_dns_changer::> Setting ethernet interface: ${interfaces[x].name}`);
+					  switch(_determinePowershellOrNetsh()) {
+					    case true:
+                shell.exec(`netsh interface ipv4 set dns name=${interfaces[x].name} static ${DNSservers[0]} primary`);
+					      shell.exec(`netsh interface ipv4 add dns name=${interfaces[x].name} ${DNSservers[1]} index=2`);
+					      break;
+
+					    default:
+					      shell.exec(`powershell Set-DnsClientServerAddress -InterfaceAlias '${interfaces[x].name}' -ServerAddresses '${DNSservers[0]},${DNSservers[1]}'`);
+					      break;
+					  }
+				  }
+				  _logging("node_dns_changer::> Flushing DNS cache.");
+				  // flush DNS cache
+				  shell.exec('ipconfig /flushdns');
+				  resolve(true);
+			  });
+			  break;
+
+		  default:
+			  _logging("node_dns_changer::> Error: Unsupported platform. ");
+			  resolve(false);
+	  }
+	});
+  let result = await promise;
+  return result;
+}
+
+exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer", loggingEnable = false, rmBackup = false}) {
+	// restore DNS from backup per platform
+	_checkVars({DNSbackupName, loggingEnable, rmBackup});
+  let promise = new Promise((resolve, reject) => {
+	  logging = loggingEnable;
+	  switch(os.platform()) {
+		  case 'linux':
+		    if (os.userInfo().uid != 0) throw "ERROR: User must be root to change DNS settings";
+			  _logging("node_dns_changer::> Changing permissions");
+			  // make mutable
+			  if (shell.exec('chattr -i /etc/resolv.conf').code !== 0) {
+          _logging("node_dns_changer::> Could not make '/etc/resolv.conf' mutable");
+          resolve(false);
+          return;
+			  }
+			  _logging("node_dns_changer::> Moving resolv.conf");
+			  // check if resolv.conf exists
+			  if (shell.test('-f', `/etc/resolv.conf.${DNSbackupName}`) !== true) {
+			    _logging(`node_dns_changer::> Could not find backed up settings '/etc/resolv.conf.${DNSbackupName}'.`);
+			    resolve(false);
+			    return;
+			  }
+
+			  _logging("node_dns_changer::> Found backed up resolv file.");
+
+		    // copy backup to resolv.conf
+		    _logging("node_dns_changer::> Restoring backup.");
+		    if (shell.rm('-f', '/etc/resolv.conf').code !== 0) {
+		      _logging("node_dns_changer::> Failed to remove current '/etc/resolv.conf'");
+		      resolve(false);
+		      return;
+		    };
+
+		    if (shell.cp('-f',`/etc/resolv.conf.${DNSbackupName}`, '/etc/resolv.conf').code !== 0) {
+		      _logging("node_dns_changer::> Failed to restore backup.");
+		      resolve(false);
+		      return;
+		    }
+
+		    if (rmBackup == true) {
+		      _logging(`node_dns_changer::> Removing backup '/etc/resolv.conf.${DNSbackupName}'.`);
+          shell.rm(`/etc/resolv.conf.${DNSbackupName}`);
+		    }
+
+			  // flush DNS cache
+			  _logging("node_dns_changer::> Flushing resolve cache");
+			  shell.exec('which systemd-resolve && systemd-resolve --flush-caches');
+			  shell.exec('which nscd && service nscd reload && service nscd restart');
+			  resolve(true);
+			  break;
+
+		  case 'darwin':
+			  // check if backup file exists
+			  var interfaces = [];
+			  var DNSservers;
+			  if (shell.test('-f', `/Library/Caches/${DNSbackupName}.txt`)) {
+				  _logging("node_dns_changer::> Found backed up DNS file.");
+				  DNSservers = shell.cat(`/Library/Caches/${DNSbackupName}.txt`).stdout;
+				  DNSservers = DNSservers.split('\n');
+				  DNSservers = DNSservers.join(' ');
+			  }
+			  else {
+				  if (logging == true) throw "node_dns_changer::> Could not find backed up DNS file.";
+			  }
+			  // get network interfaces
+			  cmd.get('networksetup -listallnetworkservices | sed 1,1d', function(err, data, stderr) {
+				  var interfaces = data;
+				  interfaces = interfaces.split('\n');
+				  if ('\n' in interfaces) interfaces = interfaces.split('\n');
+				  _logging("node_dns_changer::> Restoring DNS servers");
+				  for (x in interfaces) {
+					  // restore backed up server addresses per interface
+					  if (!(macOSignoreInterfaces.indexOf(interfaces[x]) > -1)) {
+							  _logging(`node_dns_changer::> INTERFACE: ${interfaces[x]}`);
+							  _logging(`node_dns_changer::> networksetup -setdnsservers ${interfaces[x]} ${DNSservers}`)
+							  shell.exec(`networksetup -setdnsservers ${interfaces[x]} ${DNSservers}`);
+					  }
+					  else {
+						  _logging(`Ignoring interface: ${interfaces[x]}`);
+					  }
+				  }
+				  // remove backup
+				  if (rmBackup == true) shell.rm(`/Library/Caches/${DNSbackupName}.txt`);
+				  resolve(true);
+			  });
+			  break;
+
+		  case 'win32':
+	    // check if user is admin
+      require('is-admin')().then(admin => {
+			    if (admin == false) {
+			      throw "Administator privilege are required to change DNS settings";
+			      return;
+			    }
+			  });
+			  // get interfaces
+			  var interfaces;
+			  network.get_interfaces_list(function(err, obj) {
+				  interfaces = obj;
+				  _logging(`node_dns_changer::> INTERFACES: ${JSON.stringify(interfaces)}`)
+				  for (x in interfaces) {
+					  // set DNS servers per ethernet interface
+					  _logging(`Setting ethernet interface: ${interfaces[x].name}`);
+				    switch(_determinePowershellOrNetsh()) {
+					    case true:
+                shell.exec(`netsh interface ipv4 set dns name=${interfaces[x].name} dhcp`);
+					      break;
+
+					    default:
+					      shell.exec(`powershell Set-DnsClientServerAddress -InterfaceAlias "${interfaces[x].name}" -ResetServerAddresses`);
+					      break;
+					  }
+				  }
+				  _logging("node_dns_changer::> Flushing DNS cache.");
+				  // flush DNS cache
+				  shell.exec('ipconfig /flushdns');
+			  });
+			  resolve(true);
+			  break;
+
+		  default:
+			  _logging("node_dns_changer::> Error: Unsupported platform.");
+			  resolve(false);
+	  }
+	});
+  let result = await promise;
+  return result;
 }
