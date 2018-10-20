@@ -335,3 +335,7 @@ exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer"
   let result = await promise;
   return result;
 }
+
+exports.version = function() {
+  console.log(require('./package.json').version);
+}
