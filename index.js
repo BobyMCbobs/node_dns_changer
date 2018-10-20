@@ -28,7 +28,7 @@ shell.config.silent = true;
 var macOSignoreInterfaces = ['iPhone USB', 'Bluetooth PAN', 'Thunderbolt Bridge', 'lo0', ''],
   logging = false;
 
-/*async function _getExecutionOutput(command) {
+async function _getExecutionOutput(command) {
 	// return output of a command
   let promise = new Promise((resolve, reject) => {
     var usercmd;
@@ -39,7 +39,7 @@ var macOSignoreInterfaces = ['iPhone USB', 'Bluetooth PAN', 'Thunderbolt Bridge'
 	});
   let result = await promise;
   return result;
-}*/
+}
 
 function _determinePowershellOrNetsh() {
   // if version is Windows 7 or below use netsh
@@ -182,18 +182,18 @@ exports.setDNSservers = async function({DNSservers, DNSbackupName = "before-dns-
 					  _logging(`node_dns_changer::> Setting ethernet interface: ${interfaces[x].name}`);
 					  switch(_determinePowershellOrNetsh()) {
 					    case true:
-                shell.exec(`netsh interface ipv4 set dns name=${interfaces[x].name} static ${DNSservers[0]} primary`);
-					      shell.exec(`netsh interface ipv4 add dns name=${interfaces[x].name} ${DNSservers[1]} index=2`);
+                _getExecutionOutput(`netsh interface ipv4 set dns name=${interfaces[x].name} static ${DNSservers[0]} primary`);
+					      _getExecutionOutput(`netsh interface ipv4 add dns name=${interfaces[x].name} ${DNSservers[1]} index=2`);
 					      break;
 
 					    default:
-					      shell.exec(`powershell Set-DnsClientServerAddress -InterfaceAlias '${interfaces[x].name}' -ServerAddresses '${DNSservers[0]},${DNSservers[1]}'`);
+					      _getExecutionOutput(`powershell Set-DnsClientServerAddress -InterfaceAlias '${interfaces[x].name}' -ServerAddresses '${DNSservers[0]},${DNSservers[1]}'`);
 					      break;
 					  }
 				  }
 				  _logging("node_dns_changer::> Flushing DNS cache.");
 				  // flush DNS cache
-				  shell.exec('ipconfig /flushdns');
+				  _getExecutionOutput('ipconfig /flushdns');
 				  resolve(true);
 			  });
 			  break;
@@ -312,17 +312,17 @@ exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer"
 					  _logging(`Setting ethernet interface: ${interfaces[x].name}`);
 				    switch(_determinePowershellOrNetsh()) {
 					    case true:
-                shell.exec(`netsh interface ipv4 set dns name=${interfaces[x].name} dhcp`);
+                _getExecutionOutput(`netsh interface ipv4 set dns name=${interfaces[x].name} dhcp`);
 					      break;
 
 					    default:
-					      shell.exec(`powershell Set-DnsClientServerAddress -InterfaceAlias "${interfaces[x].name}" -ResetServerAddresses`);
+					      _getExecutionOutput(`powershell Set-DnsClientServerAddress -InterfaceAlias "${interfaces[x].name}" -ResetServerAddresses`);
 					      break;
 					  }
 				  }
 				  _logging("node_dns_changer::> Flushing DNS cache.");
 				  // flush DNS cache
-				  shell.exec('ipconfig /flushdns');
+				  _getExecutionOutput('ipconfig /flushdns');
 			  });
 			  resolve(true);
 			  break;
