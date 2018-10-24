@@ -182,8 +182,8 @@ exports.setDNSservers = async function({DNSservers, DNSbackupName = "before-dns-
 					  _logging(`node_dns_changer::> Setting ethernet interface: ${interfaces[x].name}`);
 					  switch(_determinePowershellOrNetsh()) {
 					    case true:
-                _getExecutionOutput(`netsh interface ipv4 set dns name=${interfaces[x].name} static ${DNSservers[0]} primary`);
-					      _getExecutionOutput(`netsh interface ipv4 add dns name=${interfaces[x].name} ${DNSservers[1]} index=2`);
+                _getExecutionOutput(`netsh interface ipv4 set dns name="${interfaces[x].name}" static "${DNSservers[0]}" primary`);
+					      _getExecutionOutput(`netsh interface ipv4 add dns name="${interfaces[x].name}" "${DNSservers[1]}" index=2`);
 					      break;
 
 					    default:
@@ -312,7 +312,7 @@ exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer"
 					  _logging(`Setting ethernet interface: ${interfaces[x].name}`);
 				    switch(_determinePowershellOrNetsh()) {
 					    case true:
-                _getExecutionOutput(`netsh interface ipv4 set dns name=${interfaces[x].name} dhcp`);
+                _getExecutionOutput(`netsh interface ipv4 set dns name="${interfaces[x].name}" dhcp`);
 					      break;
 
 					    default:
