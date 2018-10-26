@@ -146,15 +146,15 @@ exports.setDNSservers = async function({DNSservers, DNSbackupName = "before-dns-
 				  if (mkBackup == true) {
 				    _logging("node_dns_changer::> Backing up current DNS servers");
 				    // back up current DNS server addresses
-				    shell.exec(`scutil --dns | grep 'nameserver\[[0-9]*\]' | head -n 1 | tail -n 1 | cut -d ':' -f2 > /Library/Caches/${DNSbackupName}.txt`);
-				    shell.exec(`scutil --dns | grep 'nameserver\[[0-9]*\]' | head -n 2 | tail -n 1 | cut -d ':' -f2 >> /Library/Caches/${DNSbackupName}.txt`);
+				    _getExecutionOutput(`scutil --dns | grep 'nameserver\[[0-9]*\]' | head -n 1 | tail -n 1 | cut -d ':' -f2 > /Library/Caches/${DNSbackupName}.txt`);
+				    _getExecutionOutput(`scutil --dns | grep 'nameserver\[[0-9]*\]' | head -n 2 | tail -n 1 | cut -d ':' -f2 >> /Library/Caches/${DNSbackupName}.txt`);
 				  }
 				  for (x in interfaces) {
 					  // set DNS servers, per interface
 					  if (!(macOSignoreInterfaces.indexOf(interfaces[x]) > -1)) {
 						  _logging(`node_dns_changer::> Setting interface: ${interfaces[x]}`);
 						  _logging(`node_dns_changer::> networksetup -setdnsservers ${interfaces[x]} ${DNSservers.join(' ')}`);
-						  shell.exec(`networksetup -setdnsservers ${interfaces[x]} ${DNSservers.join(' ')}`);
+						  _getExecutionOutput(`networksetup -setdnsservers ${interfaces[x]} ${DNSservers.join(' ')}`);
 					  }
 					  else {
 						  _logging(`Ignoring interface: ${interfaces[x]}`);
@@ -282,7 +282,7 @@ exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer"
 					  if (!(macOSignoreInterfaces.indexOf(interfaces[x]) > -1)) {
 							  _logging(`node_dns_changer::> INTERFACE: ${interfaces[x]}`);
 							  _logging(`node_dns_changer::> networksetup -setdnsservers ${interfaces[x]} ${DNSservers}`)
-							  shell.exec(`networksetup -setdnsservers ${interfaces[x]} ${DNSservers}`);
+							  _getExecutionOutput(`networksetup -setdnsservers ${interfaces[x]} ${DNSservers}`);
 					  }
 					  else {
 						  _logging(`Ignoring interface: ${interfaces[x]}`);
