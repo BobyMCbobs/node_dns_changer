@@ -187,9 +187,9 @@ exports.setDNSservers = async function({DNSservers, DNSbackupName = "before-dns-
 					  _logging(`Setting ethernet interface: ${interfaces[x].name}`);
 					  switch(_determinePowershellOrNetsh()) {
 					    case true:
-					      _logging(`Setting interface '${interfaces[x]}' using: netsh interface ipv4 set dns name="${interfaces[x].name}" static "${DNSservers[0]}" primary`);
+					      _logging(`Setting interface '${interfaces[x].name}' using: netsh interface ipv4 set dns name="${interfaces[x].name}" static "${DNSservers[0]}" primary`);
                 _getExecutionOutput(`netsh interface ipv4 set dns name="${interfaces[x].name}" static "${DNSservers[0]}" primary`);
-					      _logging(`Setting interface '${interfaces[x]}' using: netsh interface ipv4 add dns name="${interfaces[x].name}" "${DNSservers[1]}" index=2`);
+					      _logging(`Setting interface '${interfaces[x].name}' using: netsh interface ipv4 add dns name="${interfaces[x].name}" "${DNSservers[1]}" index=2`);
 					      _getExecutionOutput(`netsh interface ipv4 add dns name="${interfaces[x].name}" "${DNSservers[1]}" index=2`);
 					      break;
 
@@ -319,12 +319,12 @@ exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer"
 					  _logging(`Setting ethernet interface: ${interfaces[x].name}`);
 				    switch(_determinePowershellOrNetsh()) {
 					    case true:
-							  _logging(`Setting interface '${interfaces[x]}' using: netsh interface ipv4 set dns name="${interfaces[x].name}" dhcp`);
+							  _logging(`Setting interface '${interfaces[x].name}' using: netsh interface ipv4 set dns name="${interfaces[x].name}" dhcp`);
                 _getExecutionOutput(`netsh interface ipv4 set dns name="${interfaces[x].name}" dhcp`);
 					      break;
 
 					    default:
-							  _logging(`Setting interface '${interfaces[x]}' using: powershell Set-DnsClientServerAddress -InterfaceAlias "${interfaces[x].name}" -ResetServerAddresses`);
+							  _logging(`Setting interface '${interfaces[x].name}' using: powershell Set-DnsClientServerAddress -InterfaceAlias "${interfaces[x].name}" -ResetServerAddresses`);
 					      _getExecutionOutput(`powershell Set-DnsClientServerAddress -InterfaceAlias "${interfaces[x].name}" -ResetServerAddresses`);
 					      break;
 					  }

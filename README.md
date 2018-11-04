@@ -13,6 +13,7 @@ A multiplatform (Linux, Windows, macOS) DNS library for changing DNS servers wri
 	    - 7 (SP1)
 	    - 10 (1803, 1809)
 	- macOS El Capitan
+- May have problems working with Hyper-V switches on Windows
 
 ## Installing
 ```bash
