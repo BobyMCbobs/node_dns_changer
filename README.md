@@ -69,6 +69,7 @@ dns_changer.setDNSservers({
 | loggingEnable | Log the events as they take place | setDNSservers; restoreDNSservers | boolean | false |
 | mkBackup | Make a backup when applicable | setDNSservers | boolean | true |
 | rmBackup | Remove a backup when applicable | restoreDNSservers | boolean | false |
+| macOSuseDHCP | Restore DNS servers given via DHCP on macOS | restoreDNSservers | boolean | true |
 
 ## How it works
 ### Installation
@@ -83,7 +84,7 @@ dns_changer.setDNSservers({
 | - | - |
 | Linux | 1. /etc/resolv.conf is made mutible 2. /etc/resolv.conf/.(backupname) is restored to /etc/resolv.conf 3. DNS cache is flushed. |
 | Windows | 1. All ethernet and wireless interfaces are told to fetch DNS settings from DHCP 2. DNS cache is flushed. |
-| macOS | 1. DNS addresses are retrieved from the backup made during installation and are set on all network interfaces 2. DNS cache is flushed. |
+| macOS | 1. DNS addresses are either retrieved from the backup made during installation or fetched from DHCP then are set on all network interfaces 2. DNS cache is flushed. |
 
 ## Test it in Docker
 Build: `docker build -t node_dns_changer .`  

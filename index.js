@@ -71,7 +71,7 @@ function _handleServerAddresses(DNSservers) {
   else if (typeof DNSservers === 'object') return DNSservers;
 }
 
-function _checkVars({DNSservers, DNSbackupName, loggingEnable, mkBackup}) {
+function _checkVars({DNSservers, DNSbackupName, loggingEnable, mkBackup, macOSuseDHCP}) {
   if (typeof DNSservers !== 'object' && typeof DNSservers !== 'undefined') {
     throw "DNSservers must be an object";
     return;
@@ -86,6 +86,11 @@ function _checkVars({DNSservers, DNSbackupName, loggingEnable, mkBackup}) {
 
   if (typeof DNSbackupName !== 'string') {
     throw "DNSbackupName must be a string";
+    return;
+  }
+
+  if (typeof macOSuseDHCP !== 'boolean') {
+    throw "macOSuseDHCP must be a boolean";
     return;
   }
 
@@ -108,7 +113,6 @@ function _checkVars({DNSservers, DNSbackupName, loggingEnable, mkBackup}) {
 exports.setDNSservers = async function({DNSservers, DNSbackupName = "before-dns-changer", loggingEnable = false, mkBackup = true}) {
 	// set a DNS per platform
 	DNSservers = _handleServerAddresses(DNSservers);
-	_checkVars({DNSservers, DNSbackupName, loggingEnable, mkBackup});
   let promise = new Promise((resolve, reject) => {
 	  logging = loggingEnable;
 	  _logging(`Setting DNS servers: ${DNSservers}`);
@@ -215,9 +219,9 @@ exports.setDNSservers = async function({DNSservers, DNSbackupName = "before-dns-
   return result;
 }
 
-exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer", loggingEnable = false, rmBackup = false}) {
+exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer", loggingEnable = false, rmBackup = false, macOSuseDHCP = true}) {
 	// restore DNS from backup per platform
-	_checkVars({DNSbackupName, loggingEnable, rmBackup});
+	_checkVars({DNSbackupName, loggingEnable, rmBackup, macOSuseDHCP});
   let promise = new Promise((resolve, reject) => {
 	  logging = loggingEnable;
 	  switch(os.platform()) {
@@ -270,15 +274,18 @@ exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer"
 			  // check if backup file exists
 			  var interfaces = [];
 			  var DNSservers;
-			  if (shell.test('-f', `/Library/Caches/${DNSbackupName}.txt`)) {
-				  _logging("Found backed up DNS file.");
-				  DNSservers = shell.cat(`/Library/Caches/${DNSbackupName}.txt`).stdout;
-				  DNSservers = DNSservers.split('\n');
-				  DNSservers = DNSservers.join(' ');
-			  }
-			  else {
-				  if (logging == true) throw "Could not find backed up DNS file.";
-			  }
+			  if (macOSuseDHCP === false) {
+			    if (shell.test('-f', `/Library/Caches/${DNSbackupName}.txt`)) {
+				    _logging("Found backed up DNS file.");
+				    DNSservers = shell.cat(`/Library/Caches/${DNSbackupName}.txt`).stdout;
+				    DNSservers = DNSservers.split('\n');
+				    DNSservers = DNSservers.join(' ');
+				  }
+			    else {
+				    if (logging == true) throw "Could not find backed up DNS file.";
+			    }
+		    }
+			  else if (macOSuseDHCP === true) DNSservers = "";
 			  // get network interfaces
 			  cmd.get('networksetup -listallnetworkservices | sed 1,1d', function(err, data, stderr) {
 				  var interfaces = data;
@@ -288,8 +295,8 @@ exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer"
 				  for (x in interfaces) {
 					  // restore backed up server addresses per interface
 					  if (!(macOSignoreInterfaces.indexOf(interfaces[x]) > -1)) {
-							  _logging(`Setting interface '${interfaces[x]}' using: networksetup -setdnsservers ${interfaces[x]} ${DNSservers}`);
-							  _getExecutionOutput(`networksetup -setdnsservers ${interfaces[x]} ${DNSservers}`);
+              _logging(`Setting interface '${interfaces[x]}' using: networksetup -setdnsservers ${interfaces[x]} ${DNSservers}`);
+				      _getExecutionOutput(`networksetup -setdnsservers ${interfaces[x]} ${DNSservers}`);
 					  }
 					  else {
 						  _logging(`Ignoring interface: ${interfaces[x]}`);
