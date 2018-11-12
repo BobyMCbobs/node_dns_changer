@@ -49,7 +49,7 @@ dns_changer.restoreDNSservers({});
 ```
 
 Promises support:
-```javascripts
+```javascript
 const dns_changer = require('node_dns_changer');
 
 // set DNS servers with backup name of 'dnsBackup'
