@@ -57,8 +57,8 @@ dns_changer.setDNSservers({
 	DNSservers: ['8.8.8.8','8.8.4.4'],
 	mkBackup: true,
 	DNSbackupName: 'dnsBackup'
-}).then((a) => {
-    if (a == true) console.log("SUCCEEDED SUCCESSFULLY");
+}).then((response) => {
+    if (response) console.log(`${response === true ? "DNS changing complete" : "DNS changing failed"}.`);
 });
 ```
 

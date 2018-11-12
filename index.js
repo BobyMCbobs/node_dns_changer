@@ -285,7 +285,7 @@ exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer"
 				    if (logging == true) throw "Could not find backed up DNS file.";
 			    }
 		    }
-			  else if (macOSuseDHCP === true) DNSservers = "";
+			  else if (macOSuseDHCP === true) DNSservers = "\"Empty\"";
 			  // get network interfaces
 			  cmd.get('networksetup -listallnetworkservices | sed 1,1d', function(err, data, stderr) {
 				  var interfaces = data;
