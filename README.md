@@ -11,6 +11,7 @@ A multiplatform (Linux, Windows, macOS) DNS library for changing DNS servers wri
 		- Fedora 28
 	- Windows
 	    - 7 (SP1)
+	    - 8.1
 	    - 10 (1803, 1809)
 	- macOS El Capitan
 - May have problems working with Hyper-V switches on Windows
