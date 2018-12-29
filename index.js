@@ -18,11 +18,12 @@
 //
 
 const exec = require('child_process').execSync,
- os = require('os'),
- fs = require('fs'),
- shell = require('shelljs'),
- cmd = require('node-cmd'),
- network = require('network');
+  os = require('os'),
+  fs = require('fs'),
+  shell = require('shelljs'),
+  cmd = require('node-cmd'),
+  network = require('network'),
+  version = require('./package.json').version;
 shell.config.silent = true;
 
 var macOSignoreInterfaces = ['iPhone USB', 'Bluetooth PAN', 'Thunderbolt Bridge', 'lo0', ''],
@@ -145,8 +146,8 @@ exports.setDNSservers = async function({DNSservers, DNSbackupName = "before-dns-
 			  shell.exec('chattr +i /etc/resolv.conf');
 			  _logging("Flushing DNS cache (if systemd-resolve is available).");
 			  // flush DNS cache
-			  shell.exec('which systemd-resolve && systemd-resolve --flush-caches');
-			  shell.exec('which nscd && service nscd reload && service nscd restart');
+			  shell.exec('which systemd-resolve 2> /dev/null && systemd-resolve --flush-caches');
+			  shell.exec('systemctl is-active --quiet nscd && service nscd reload && service nscd restart');
 			  resolve(true);
 			  break;
 
@@ -270,8 +271,8 @@ exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer"
 
 			  // flush DNS cache
 			  _logging("Flushing resolve cache");
-			  shell.exec('which systemd-resolve && systemd-resolve --flush-caches');
-			  shell.exec('which nscd && service nscd reload && service nscd restart');
+			  shell.exec('which systemd-resolve 2> /dev/null && systemd-resolve --flush-caches');
+			  shell.exec('systemctl is-active --quiet nscd && service nscd reload && service nscd restart');
 			  resolve(true);
 			  break;
 
@@ -357,6 +358,4 @@ exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer"
   return result;
 }
 
-exports.version = function() {
-  return (require('./package.json').version);
-}
+exports.version = version;
