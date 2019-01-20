@@ -1,7 +1,7 @@
 // node_dns_changer
 
 //
-// Copyright (C) 2018 Caleb Woodbine <calebwoodbine.public@gmail.com>
+// Copyright (C) 2018 - 2019 Caleb Woodbine <calebwoodbine.public@gmail.com>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -29,9 +29,9 @@ shell.config.silent = true;
 var macOSignoreInterfaces = ['iPhone USB', 'Bluetooth PAN', 'Thunderbolt Bridge', 'lo0', ''],
   logging = false;
 
-async function _getExecutionOutput(command) {
+function _getExecutionOutput(command) {
 	// return output of a command
-  let promise = new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     var usercmd;
     cmd.get(command, function(err, data, stderr) {
 	    usercmd = data;
@@ -39,8 +39,6 @@ async function _getExecutionOutput(command) {
 	    resolve(true);
     });
 	});
-  let result = await promise;
-  return result;
 }
 
 function _determinePowershellOrNetsh() {
@@ -111,18 +109,24 @@ function _checkVars({DNSservers, DNSbackupName, loggingEnable, mkBackup, macOSus
   }
 }
 
-exports.setDNSservers = async function({DNSservers, DNSbackupName = "before-dns-changer", loggingEnable = false, mkBackup = true}) {
+exports.setDNSservers = async function({DNSservers, DNSbackupName = "before-dns-changer", loggingEnable = false, mkBackup = true, linuxUsePkexec = false}) {
 	// set a DNS per platform
 	if (_checkVars({DNSservers, DNSbackupName, loggingEnable, mkBackup}) === false) {
 	  return;
 	}
 	DNSservers = _handleServerAddresses(DNSservers);
-  let promise = new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
 	  logging = loggingEnable;
 	  _logging(`Setting DNS servers: '${DNSservers}'`);
 	  if (DNSservers === undefined) throw "You must include two DNS server addresses";
 	  switch(os.platform()) {
 		  case 'linux':
+		    if (linuxUsePkexec === true) {
+		      var subCommand = shell.exec(`pkexec ${path.join(process.cwd(),'node_dns_changer.sh')} set ${DNSservers[0]} ${DNSservers[1]}`)
+		      if (subCommand === 0) resolve(true);
+		      return;
+		    }
+
 		    if (os.userInfo().uid != 0) {
 		      throw "ERROR: User must be root to change DNS settings";
 		      resolve(false);
@@ -219,19 +223,23 @@ exports.setDNSservers = async function({DNSservers, DNSbackupName = "before-dns-
 			  resolve(false);
 	  }
 	});
-  let result = await promise;
-  return result;
 }
 
-exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer", loggingEnable = false, rmBackup = false, macOSuseDHCP = true}) {
+exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer", loggingEnable = false, rmBackup = false, macOSuseDHCP = true, linuxUsePkexec = false}) {
 	// restore DNS from backup per platform
 	if (_checkVars({DNSbackupName, loggingEnable, rmBackup, macOSuseDHCP}) === false) {
 	  return;
 	}
-  let promise = new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
 	  logging = loggingEnable;
 	  switch(os.platform()) {
 		  case 'linux':
+		    if (linuxUsePkexec === true) {
+		      var subCommand = shell.exec(`pkexec ${path.join(process.cwd(),'node_dns_changer.sh')} restore`)
+		      if (subCommand === 0) resolve(true);
+		      return;
+		    }
+
 		    if (os.userInfo().uid != 0) throw "ERROR: User must be root to change DNS settings";
 			  _logging("Changing permissions");
 			  // make mutable
@@ -354,8 +362,6 @@ exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer"
 			  resolve(false);
 	  }
 	});
-  let result = await promise;
-  return result;
 }
 
 exports.version = version;
