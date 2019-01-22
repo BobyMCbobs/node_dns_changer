@@ -116,7 +116,7 @@ function _checkVars({DNSservers, DNSbackupName, loggingEnable, mkBackup, macOSus
   }
 }
 
-exports.setDNSservers = async function({DNSservers, DNSbackupName = "before-dns-changer", loggingEnable = false, mkBackup = true, windowsPreferNetsh = false, windowsPreferNetsh}) {
+exports.setDNSservers = async function({DNSservers, DNSbackupName = "before-dns-changer", loggingEnable = false, mkBackup = true, windowsPreferNetsh = false}) {
 	// set a DNS per platform
 	if (_checkVars({DNSservers, DNSbackupName, loggingEnable, mkBackup}) === false) {
 	  return;
