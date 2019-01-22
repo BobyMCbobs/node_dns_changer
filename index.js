@@ -60,7 +60,7 @@ function _logging(text) {
   if (logging == true) console.log(`[node_dns_changer]: ${text}`);
 }
 
-function _handleServerAddresses(DNSservers) {
+function _formatDNSServerAddresses(DNSservers) {
   // if input is a string, convert it to an array of strings
   if (typeof DNSservers === 'string') {
     if ((" " in DNSservers)) return DNSservers.split(' ');
@@ -72,7 +72,7 @@ function _handleServerAddresses(DNSservers) {
   else if (typeof DNSservers === 'object') return DNSservers;
 }
 
-function _checkVars({DNSservers, DNSbackupName, loggingEnable, mkBackup, macOSuseDHCP}) {
+function _checkVars({DNSservers, DNSbackupName, loggingEnable, mkBackup, macOSuseDHCP, windowsPreferNetsh}) {
   if (typeof DNSservers !== 'object' && typeof DNSservers !== 'undefined') {
     throw "[node_dns_changer:validation]: DNSservers must be an object";
     return false;
@@ -109,14 +109,19 @@ function _checkVars({DNSservers, DNSbackupName, loggingEnable, mkBackup, macOSus
     throw "[node_dns_changer:validation]: rmBackup must be a boolean";
     return false;
   }
+
+  if (typeof windowsPreferNetsh !== 'boolean' && typeof windowsPreferNetsh !== 'undefined') {
+    throw "[node_dns_changer:validation]: windowsPreferNetsh must be a boolean";
+    return false;
+  }
 }
 
-exports.setDNSservers = async function({DNSservers, DNSbackupName = "before-dns-changer", loggingEnable = false, mkBackup = true}) {
+exports.setDNSservers = async function({DNSservers, DNSbackupName = "before-dns-changer", loggingEnable = false, mkBackup = true, windowsPreferNetsh = false, windowsPreferNetsh}) {
 	// set a DNS per platform
 	if (_checkVars({DNSservers, DNSbackupName, loggingEnable, mkBackup}) === false) {
 	  return;
 	}
-	DNSservers = _handleServerAddresses(DNSservers);
+	DNSservers = _formatDNSServerAddresses(DNSservers);
   let promise = new Promise((resolve, reject) => {
 	  logging = loggingEnable;
 	  _logging(`Setting DNS servers: '${DNSservers}'`);
@@ -193,7 +198,7 @@ exports.setDNSservers = async function({DNSservers, DNSbackupName = "before-dns-
 				  for (x in interfaces) {
 					  // set DNS servers per ethernet interface
 					  _logging(`Setting ethernet interface: ${interfaces[x].name}`);
-					  switch(_determinePowershellOrNetsh()) {
+					  switch(_determinePowershellOrNetsh() || windowsPreferNetsh === true) {
 					    case true:
 					      _logging(`Setting interface '${interfaces[x].name}' using: netsh interface ipv4 set dns name="${interfaces[x].name}" static "${DNSservers[0]}" primary`);
                 _getExecutionOutput(`netsh interface ipv4 set dns name="${interfaces[x].name}" static "${DNSservers[0]}" primary`);
@@ -223,9 +228,9 @@ exports.setDNSservers = async function({DNSservers, DNSbackupName = "before-dns-
   return result;
 }
 
-exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer", loggingEnable = false, rmBackup = false, macOSuseDHCP = true}) {
+exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer", loggingEnable = false, rmBackup = false, macOSuseDHCP = true, windowsPreferNetsh = false}) {
 	// restore DNS from backup per platform
-	if (_checkVars({DNSbackupName, loggingEnable, rmBackup, macOSuseDHCP}) === false) {
+	if (_checkVars({DNSbackupName, loggingEnable, rmBackup, macOSuseDHCP, windowsPreferNetsh}) === false) {
 	  return;
 	}
   let promise = new Promise((resolve, reject) => {
@@ -330,7 +335,7 @@ exports.restoreDNSservers = async function({DNSbackupName = "before-dns-changer"
 				  for (x in interfaces) {
 					  // set DNS servers per ethernet interface
 					  _logging(`Setting ethernet interface: ${interfaces[x].name}`);
-				    switch(_determinePowershellOrNetsh()) {
+				    switch(_determinePowershellOrNetsh() || windowsPreferNetsh === true) {
 					    case true:
 							  _logging(`Setting interface '${interfaces[x].name}' using: netsh interface ipv4 set dns name="${interfaces[x].name}" dhcp`);
                 _getExecutionOutput(`netsh interface ipv4 set dns name="${interfaces[x].name}" dhcp`);
