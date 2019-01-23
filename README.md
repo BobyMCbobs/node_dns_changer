@@ -71,6 +71,7 @@ dns_changer.setDNSservers({
 | mkBackup | Make a backup when applicable | setDNSservers | boolean | true |
 | rmBackup | Remove a backup when applicable | restoreDNSservers | boolean | false |
 | macOSuseDHCP | Restore DNS servers given via DHCP on macOS | restoreDNSservers | boolean | true |
+| windowsPreferNetsh | Use netsh instead of powershell for functions on Windows 8 and above | setDNSservers; restoreDNSservers | boolean | false |
 
 ## How it works
 ### Installation
